@@ -26,6 +26,8 @@ from wsgi import app
 from service.common import status
 from service.models import db, Order
 
+from .factories import OrderFactory
+
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "postgresql+psycopg://postgres:postgres@localhost:5432/testdb"
 )
@@ -74,3 +76,26 @@ class OrderService(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
     # Todo: Add your test cases here...
+
+    def test_get_order(self):
+        """It should Get a single order"""
+        # create one order in the database
+        test_order = OrderFactory()
+        test_order.create()
+
+        response = self.client.get(f"{BASE_URL}/{test_order.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.get_json()
+        self.assertEqual(data["name"], test_order.name)
+        self.assertEqual(data["id"], test_order.id)
+        self.assertEqual(data["address"], test_order.address)
+        self.assertEqual(data["email"], test_order.email)
+
+    def test_get_order_not_found(self):
+        """It should not Get an order thats not found"""
+        response = self.client.get(f"{BASE_URL}/0")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        data = response.get_json()
+        logging.debug("Response data = %s", data)
+        self.assertIn("was not found", data["message"])

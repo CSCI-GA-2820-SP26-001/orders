@@ -43,3 +43,20 @@ def index():
 ######################################################################
 
 # Todo: Place your REST API code here ...
+
+@app.route("/orders/<int:order_id>", methods=["GET"])
+def get_orders(order_id):
+    """
+    Retrieve a single order
+
+    This endpoint will return a order based on it's id
+    """
+    app.logger.info("Request to Retrieve a order with id [%s]", order_id)
+
+    # Attempt to find the order and abort if not found
+    order = Order.find(order_id)
+    if not order:
+        abort(status.HTTP_404_NOT_FOUND, f"order with id '{order_id}' was not found.")
+
+    app.logger.info("Returning order: %s", order.id)
+    return jsonify(order.serialize()), status.HTTP_200_OK
