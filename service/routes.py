@@ -44,3 +44,28 @@ def index():
 ######################################################################
 
 # Todo: Place your REST API code here ...
+
+def create_order():
+    """
+    Create a Order
+    This endpoint will create a Order based the data in the body that is posted
+    """
+    app.logger.info("Request to Create a Order...")
+    check_content_type("application/json")
+
+    order = Order()
+    data = request.get_json()
+    app.logger.info("Processing: %s", data)
+    order.deserialize(data)
+
+    order.create()
+    app.logger.info("Order with new id [%s] saved!", order.id)
+
+    location_url = url_for(
+        "get_orders", order_id=order.id, _external=True
+    )
+    return (
+        jsonify(order.serialize()),
+        status.HTTP_201_CREATED,
+        {"Location": location_url},
+    )
