@@ -115,30 +115,23 @@ class OrderService(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
-    @app.route("/orders/<int:order_id>", methods=["PUT"])
-def update_order(order_id):
-    """
-    Update a Order
+    def test_update_order(self):
+        """It should Update an existing Order"""
+        # create an order to update
+        test_order = OrderFactory()
+        response = self.client.post(BASE_URL, json=test_order.serialize())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    This endpoint will update a Order based the body that is posted
-    """
-    app.logger.info(
-        "Request to Update a order with id [%s]", order_id
-    )
-    check_content_type("application/json")
-
-    order = Order.find(order_id)
-    if not order:
-        abort(
-            status.HTTP_404_NOT_FOUND,
-            f"Order with id '{order_id}' was not found.",
+        # update the order
+        new_order = response.get_json()
+        logging.debug(new_order)
+        new_order["name"] = "Updated Order"
+        response = self.client.put(
+            f"{BASE_URL}/{new_order['id']}", json=new_order
         )
-
-    data = request.get_json()
-    app.logger.info("Processing: %s", data)
-    order.deserialize(data)
-
-    order.update()
-
-    app.logger.info("Order with ID: %d updated.", order.id)
-    return jsonify(order.serialize()), status.HTTP_200_OK
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        updated_order = response.get_json()
+        self.assertEqual(
+            updated_order["name"],
+            "Updated Order",
+        )
