@@ -24,9 +24,9 @@ import logging
 from unittest import TestCase
 from wsgi import app
 from service.common import status
-from service.models import db, Order
+from service.models import db, Order, Item
 
-from .factories import OrderFactory
+from .factories import OrderFactory, ItemFactory
 
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "postgresql+psycopg://postgres:postgres@localhost:5432/testdb"
@@ -59,6 +59,7 @@ class OrderService(TestCase):
     def setUp(self):
         """Runs before each test"""
         self.client = app.test_client()
+        db.session.query(Item).delete()  # clean up items first (FK constraint)
         db.session.query(Order).delete()  # clean up the last tests
         db.session.commit()
 
@@ -117,6 +118,125 @@ class OrderService(TestCase):
         logging.debug("Response data = %s", data)
         self.assertIn("was not found", data["message"])
 
+    def test_update_order(self):
+        """It should Update an existing Order and return 200"""
+        test_order = OrderFactory()
+        test_order.create()
+
+        updated_data = {
+            "name": "Updated Name",
+            "address": test_order.address,
+            "email": test_order.email,
+        }
+        response = self.client.put(
+            f"{BASE_URL}/{test_order.id}",
+            json=updated_data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["name"], "Updated Name")
+        self.assertEqual(data["id"], test_order.id)
+
+    def test_update_order_with_items(self):
+        """It should Update an Order with items and return 200"""
+        test_order = OrderFactory()
+        test_order.create()
+
+        item = ItemFactory.build()
+        updated_data = {
+            "name": test_order.name,
+            "address": test_order.address,
+            "email": test_order.email,
+            "items": [
+                {"name": item.name, "quantity": item.quantity, "price": item.price}
+            ],
+        }
+        response = self.client.put(
+            f"{BASE_URL}/{test_order.id}",
+            json=updated_data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data["items"]), 1)
+        self.assertEqual(data["items"][0]["name"], item.name)
+        self.assertEqual(data["items"][0]["quantity"], item.quantity)
+
+    def test_update_order_not_found(self):
+        """It should return 404 when updating an Order that does not exist"""
+        response = self.client.put(
+            f"{BASE_URL}/0",
+            json={"name": "X", "address": "Y", "email": "z@z.com"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        data = response.get_json()
+        self.assertIn("was not found", data["message"])
+
+    def test_update_order_bad_data(self):
+        """It should return 400 when updating an Order with missing required fields"""
+        test_order = OrderFactory()
+        test_order.create()
+
+        response = self.client.put(
+            f"{BASE_URL}/{test_order.id}",
+            json={"name": "Missing fields"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_update_order_no_body(self):
+        """It should return 400 when updating with no JSON body"""
+        test_order = OrderFactory()
+        test_order.create()
+
+        response = self.client.put(
+            f"{BASE_URL}/{test_order.id}",
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unsupported_media_type(self):
+        """It should return 415 when Content-Type is not application/json"""
+        test_order = OrderFactory()
+        test_order.create()
+
+        response = self.client.put(
+            f"{BASE_URL}/{test_order.id}",
+            data="not json",
+            content_type="text/plain",
+        )
+        self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
+
+    def test_method_not_allowed(self):
+        """It should return 405 for unsupported HTTP methods"""
+        response = self.client.delete(f"{BASE_URL}/0")
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_update_order_then_get(self):
+        """It should return the updated Order data on subsequent GET"""
+        test_order = OrderFactory()
+        test_order.create()
+
+        updated_data = {
+            "name": "Confirmed Update",
+            "address": "123 New St",
+            "email": "new@example.com",
+        }
+        put_response = self.client.put(
+            f"{BASE_URL}/{test_order.id}",
+            json=updated_data,
+            content_type="application/json",
+        )
+        self.assertEqual(put_response.status_code, status.HTTP_200_OK)
+
+        get_response = self.client.get(f"{BASE_URL}/{test_order.id}")
+        self.assertEqual(get_response.status_code, status.HTTP_200_OK)
+        data = get_response.get_json()
+        self.assertEqual(data["name"], "Confirmed Update")
+        self.assertEqual(data["address"], "123 New St")
+        self.assertEqual(data["email"], "new@example.com")
 
     def test_delete_order(self):
         """It should Delete a order"""
