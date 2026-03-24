@@ -116,3 +116,17 @@ class OrderService(TestCase):
         data = response.get_json()
         logging.debug("Response data = %s", data)
         self.assertIn("was not found", data["message"])
+
+
+    def test_delete_order(self):
+        """It should Delete a order"""
+        # create one order in the database
+        test_order = OrderFactory()
+        test_order.create()
+
+        response = self.client.delete(f"{BASE_URL}/{test_order.id}")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        # make sure the order is deleted
+        response = self.client.get(f"{BASE_URL}/{test_order.id}")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
