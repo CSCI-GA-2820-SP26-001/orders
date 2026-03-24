@@ -24,9 +24,9 @@ import logging
 from unittest import TestCase
 from wsgi import app
 from service.common import status
-from service.models import db, Order
+from service.models import db, Order, Item
 
-from .factories import OrderFactory
+from .factories import OrderFactory, ItemFactory
 
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "postgresql+psycopg://postgres:postgres@localhost:5432/testdb"
@@ -59,6 +59,7 @@ class OrderService(TestCase):
     def setUp(self):
         """Runs before each test"""
         self.client = app.test_client()
+        db.session.query(Item).delete()  # clean up items first (FK constraint)
         db.session.query(Order).delete()  # clean up the last tests
         db.session.commit()
 
@@ -70,12 +71,75 @@ class OrderService(TestCase):
     #  P L A C E   T E S T   C A S E S   H E R E
     ######################################################################
 
+    def _create_orders(self, count: int = 1) -> list:
+        """Factory method to create orders in bulk"""
+        orders = []
+        for _ in range(count):
+            test_order = OrderFactory()
+            response = self.client.post(BASE_URL, json=test_order.serialize())
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_201_CREATED,
+                "Could not create test order",
+            )
+            new_order = response.get_json()
+            test_order.id = new_order["id"]
+            orders.append(test_order)
+        return orders
+
+
     def test_index(self):
         """It should call the home page"""
         resp = self.client.get("/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
-    # Todo: Add your test cases here...
+        data = resp.get_json()
+        self.assertIsNotNone(data)
+        self.assertIn("name", data)
+        self.assertIn("version", data)
+        self.assertIn("paths", data)
+        self.assertEqual(data["paths"]["list_orders"], "/orders")
+
+    def test_list_orders(self):
+        """It should return a list of all Orders"""
+        for _ in range(3):
+            OrderFactory().create()
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 3)
+
+    def test_create_order(self):
+        """It should Create a new Order"""
+        test_order = OrderFactory.build()
+        response = self.client.post(
+            BASE_URL,
+            json={
+                "name": test_order.name,
+                "address": test_order.address,
+                "email": test_order.email,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        data = response.get_json()
+        self.assertEqual(data["name"], test_order.name)
+        self.assertIn("Location", response.headers)
+
+    def test_create_order_missing_data(self):
+        """It should return 400 when creating an Order with missing fields"""
+        response = self.client.post(
+            BASE_URL,
+            json={"name": "Incomplete"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        
+    def test_create_order_no_content_type(self):
+        """It should return 415 when creating an Order without Content-Type"""
+        response = self.client.post(BASE_URL, data="not json")
+        self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
     def test_get_order(self):
         """It should Get a single order"""
