@@ -172,3 +172,71 @@ class TestOrder(TestCase):
         order.create()
         with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
             self.assertRaises(DataValidationError, order.delete)
+
+    def test_create_order_error(self):
+        """It should raise DataValidationError on create failure"""
+        order = OrderFactory()
+        with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
+            self.assertRaises(DataValidationError, order.create)
+
+    def test_deserialize_with_items(self):
+        """It should deserialize an Order that includes Items"""
+        data = {
+            "name": "Test Order",
+            "address": "123 Main St",
+            "email": "test@test.com",
+            "items": [
+                {"name": "Widget", "quantity": 2, "price": 9.99},
+                {"name": "Gadget", "quantity": 1, "price": 19.99},
+            ],
+        }
+        order = Order()
+        order.deserialize(data)
+        self.assertEqual(order.name, "Test Order")
+        self.assertEqual(len(order.items), 2)
+        self.assertEqual(order.items[0].name, "Widget")
+
+    def test_deserialize_attribute_error(self):
+        """It should raise DataValidationError on attribute error"""
+        order = Order()
+        self.assertRaises(DataValidationError, order.deserialize, [])
+
+    def test_item_serialize(self):
+        """It should serialize an Item into a dictionary"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory(order_id=order.id)
+        order.items.append(item)
+        order.update()
+        found_item = order.items[0]
+        data = found_item.serialize()
+        self.assertEqual(data["name"], found_item.name)
+        self.assertEqual(data["quantity"], found_item.quantity)
+        self.assertEqual(data["price"], found_item.price)
+        self.assertEqual(data["order_id"], order.id)
+
+    def test_item_deserialize_happy_path(self):
+        """It should deserialize an Item from a dictionary"""
+        data = {"name": "Widget", "quantity": 3, "price": 12.50}
+        item = Item()
+        item.deserialize(data)
+        self.assertEqual(item.name, "Widget")
+        self.assertEqual(item.quantity, 3)
+        self.assertEqual(item.price, 12.50)
+
+    def test_item_find(self):
+        """It should find an Item by its ID"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory(order_id=order.id)
+        order.items.append(item)
+        order.update()
+        found = Item.find(order.items[0].id)
+        self.assertIsNotNone(found)
+        self.assertEqual(found.name, item.name)
+
+    def test_order_repr(self):
+        """It should return a string representation of Order"""
+        order = OrderFactory()
+        order.create()
+        self.assertIn("Order", repr(order))
