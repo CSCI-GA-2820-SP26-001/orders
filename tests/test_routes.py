@@ -296,6 +296,91 @@ class OrderService(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    ######################################################################
+    #  U P D A T E   I T E M   T E S T   C A S E S
+    ######################################################################
+
+    def test_update_item_in_order(self):
+        """It should Update an Item in an Order"""
+        order, item = self._create_order_with_item()
+
+        updated_data = {
+            "name": "Updated Widget",
+            "quantity": 5,
+            "price": 19.99,
+        }
+        response = self.client.put(
+            f"{BASE_URL}/{order.id}/items/{item.id}",
+            json=updated_data,
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["name"], "Updated Widget")
+        self.assertEqual(data["quantity"], 5)
+        self.assertEqual(data["price"], 19.99)
+        self.assertEqual(data["id"], item.id)
+        self.assertEqual(data["order_id"], order.id)
+
+    def test_update_item_order_not_found(self):
+        """It should return 404 when updating an Item in a non-existent Order"""
+        response = self.client.put(
+            f"{BASE_URL}/0/items/0",
+            json={"name": "X", "quantity": 1, "price": 1.0},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        data = response.get_json()
+        self.assertIn("not found", data["message"])
+
+    def test_update_item_not_found(self):
+        """It should return 404 when the Item does not exist"""
+        order = OrderFactory()
+        order.create()
+
+        response = self.client.put(
+            f"{BASE_URL}/{order.id}/items/0",
+            json={"name": "X", "quantity": 1, "price": 1.0},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        data = response.get_json()
+        self.assertIn("not found", data["message"])
+
+    def test_update_item_wrong_order(self):
+        """It should return 404 when the Item belongs to a different Order"""
+        order1, item = self._create_order_with_item()
+        order2 = OrderFactory()
+        order2.create()
+
+        response = self.client.put(
+            f"{BASE_URL}/{order2.id}/items/{item.id}",
+            json={"name": "X", "quantity": 1, "price": 1.0},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_update_item_bad_data(self):
+        """It should return 400 when updating an Item with missing fields"""
+        order, item = self._create_order_with_item()
+
+        response = self.client.put(
+            f"{BASE_URL}/{order.id}/items/{item.id}",
+            json={"name": "Missing fields"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_update_item_no_content_type(self):
+        """It should return 415 when updating an Item without Content-Type"""
+        order, item = self._create_order_with_item()
+
+        response = self.client.put(
+            f"{BASE_URL}/{order.id}/items/{item.id}",
+            data="not json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
+
     def test_update_order_then_get(self):
         """It should return the updated Order data on subsequent GET"""
         test_order = OrderFactory()
