@@ -22,7 +22,7 @@ and Delete Order"""
 
 from flask import jsonify, request, url_for, abort
 from flask import current_app as app  # Import Flask application
-from service.models import Order, DataValidationError
+from service.models import Order, Item, DataValidationError
 from service.common import status  # HTTP Status Codes
 
 
@@ -44,6 +44,7 @@ def index():
 
 # Todo: Place your REST API code here ...
 
+@app.route("/orders", methods=["POST"])
 def create_order():
     """
     Create a Order
@@ -111,3 +112,59 @@ def update_orders(order_id):
     order.update()
     app.logger.info("Order with id [%s] updated.", order_id)
     return jsonify(order.serialize()), status.HTTP_200_OK
+
+
+######################################################################
+# READ AN ITEM IN AN ORDER
+######################################################################
+@app.route("/orders/<int:order_id>/items/<int:item_id>", methods=["GET"])
+def get_order_item(order_id, item_id):
+    """
+    Read an Item in an Order
+
+    This endpoint will return an Item from an Order based on their ids
+    """
+    app.logger.info(
+        "Request to Read item %s in order %s", item_id, order_id
+    )
+
+    order = Order.find(order_id)
+    if not order:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Order with id '{order_id}' was not found.",
+        )
+
+    item = Item.find(item_id)
+    if not item or item.order_id != order_id:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Item with id '{item_id}' was not found in order '{order_id}'.",
+        )
+
+    app.logger.info("Returning item %s from order %s", item_id, order_id)
+    return jsonify(item.serialize()), status.HTTP_200_OK
+
+
+######################################################################
+# UTILITY FUNCTIONS
+######################################################################
+def check_content_type(content_type) -> None:
+    """Checks that the media type is correct"""
+    if "Content-Type" not in request.headers:
+        app.logger.error("No Content-Type specified.")
+        abort(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            f"Content-Type must be {content_type}",
+        )
+
+    if request.headers["Content-Type"] == content_type:
+        return
+
+    app.logger.error(
+        "Invalid Content-Type: %s", request.headers["Content-Type"]
+    )
+    abort(
+        status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        f"Content-Type must be {content_type}",
+    )
