@@ -27,6 +27,7 @@ class Order(db.Model):
     name = db.Column(db.String(63))
     address = db.Column(db.String(256))
     email = db.Column(db.String(256))
+    status = db.Column(db.String(64), nullable=False, default="Unprocessed")
     items = db.relationship("Item", backref="order", cascade="all, delete-orphan", lazy=True)
 
     def __repr__(self):
@@ -78,6 +79,7 @@ class Order(db.Model):
             "name": self.name,
             "address": self.address,
             "email": self.email,
+            "status": self.status,
             "items": [item.serialize() for item in self.items],
         }
 
@@ -92,6 +94,7 @@ class Order(db.Model):
             self.name = data["name"]
             self.address = data["address"]
             self.email = data["email"]
+            self.status = data.get("status", "Unprocessed")
             if "items" in data:
                 self.items = []
                 for item_data in data["items"]:
@@ -154,6 +157,38 @@ class Item(db.Model):
     def __repr__(self):
         return f"<Item {self.name} id=[{self.id}] order_id=[{self.order_id}]>"
 
+    def create(self):
+        """Creates an Item to the database"""
+        logger.info("Creating Item %s", self.name)
+        try:
+            db.session.add(self)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error("Error creating Item: %s", self)
+            raise DataValidationError(e) from e
+
+    def update(self):
+        """Updates an Item in the database"""
+        logger.info("Saving Item %s", self.name)
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error("Error updating Item: %s", self)
+            raise DataValidationError(e) from e
+
+    def delete(self):
+        """Removes an Item from the data store"""
+        logger.info("Deleting Item %s", self.name)
+        try:
+            db.session.delete(self)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error("Error deleting Item: %s", self)
+            raise DataValidationError(e) from e
+
     def serialize(self):
         """Serializes an Item into a dictionary"""
         return {
@@ -178,6 +213,12 @@ class Item(db.Model):
             raise DataValidationError(
                 "Invalid Item: body of request contained bad or no data " + str(error)
             ) from error
+
+        if not isinstance(self.quantity, int) or self.quantity <= 0:
+            raise DataValidationError("Invalid Item: quantity must be a positive integer")
+        if not isinstance(self.price, (int, float)) or self.price <= 0:
+            raise DataValidationError("Invalid Item: price must be a positive number")
+
         return self
 
     @classmethod
