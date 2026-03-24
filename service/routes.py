@@ -85,3 +85,24 @@ def get_orders(order_id):
 
     app.logger.info("Returning order: %s", order.id)
     return jsonify(order.serialize()), status.HTTP_200_OK
+
+
+# Delete a order with API
+@app.route("/orders/<int:order_id>", methods=["DELETE"])
+def delete_order(order_id):
+    """
+    Delete a Order
+
+    This endpoint will delete a Order based the id specified in the path
+    """
+    app.logger.info(
+        "Request to Delete a order with id [%s]", order_id
+    )
+
+    order = Order.find(order_id)
+    if order:
+        app.logger.info("Order with ID: %d found.", order.id)
+        order.delete()
+
+    app.logger.info("Order with ID: %d delete complete.", order_id)
+    return {}, status.HTTP_204_NO_CONTENT
