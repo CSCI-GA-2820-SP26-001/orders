@@ -33,7 +33,13 @@ from service.common import status  # HTTP Status Codes
 def index():
     """Root URL response"""
     return (
-        "Reminder: return some useful information in json format about the service here",
+        jsonify(
+            name = "Orders Service",
+            version="1.0.0",
+            paths = {
+                "list_orders":"/orders"
+            },
+        ),
         status.HTTP_200_OK,
     )
 

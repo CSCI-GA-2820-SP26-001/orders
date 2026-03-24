@@ -75,6 +75,14 @@ class OrderService(TestCase):
         resp = self.client.get("/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
+        data = resp.get_json()
+        self.assertIsNotNone(data)
+        self.assertIn("name", data)
+        self.assertIn("version", data)
+        self.assertIn("paths", data)
+        self.assertEqual(data["paths"]["list_orders"], "/orders")
+
+
     # Todo: Add your test cases here...
 
     def test_get_order(self):
