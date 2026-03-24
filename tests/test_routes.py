@@ -483,3 +483,12 @@ class OrderService(TestCase):
 
         response = self.client.delete(f"{BASE_URL}/{test_order.id}/items/{test_item.id}")
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    ######################################################################
+    #  E R R O R   H A N D L E R   T E S T S
+    ######################################################################
+
+    def test_method_not_allowed(self):
+        """It should return 405 when using an unsupported HTTP method"""
+        response = self.client.patch(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
