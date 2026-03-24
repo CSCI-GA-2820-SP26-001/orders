@@ -15,15 +15,14 @@
 ######################################################################
 
 """
-YourResourceModel Service
+Order Service
 
 This service implements a REST API that allows you to Create, Read, Update
-and Delete YourResourceModel
-"""
+and Delete Order"""
 
 from flask import jsonify, request, url_for, abort
 from flask import current_app as app  # Import Flask application
-from service.models import YourResourceModel
+from service.models import Order
 from service.common import status  # HTTP Status Codes
 
 
@@ -69,3 +68,20 @@ def create_order():
         status.HTTP_201_CREATED,
         {"Location": location_url},
     )
+
+@app.route("/orders/<int:order_id>", methods=["GET"])
+def get_orders(order_id):
+    """
+    Retrieve a single order
+
+    This endpoint will return a order based on it's id
+    """
+    app.logger.info("Request to Retrieve a order with id [%s]", order_id)
+
+    # Attempt to find the order and abort if not found
+    order = Order.find(order_id)
+    if not order:
+        abort(status.HTTP_404_NOT_FOUND, f"order with id '{order_id}' was not found.")
+
+    app.logger.info("Returning order: %s", order.id)
+    return jsonify(order.serialize()), status.HTTP_200_OK
