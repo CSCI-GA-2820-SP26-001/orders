@@ -172,3 +172,56 @@ class TestOrder(TestCase):
         order.create()
         with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
             self.assertRaises(DataValidationError, order.delete)
+
+    def test_create_item(self):
+        """It should create an Item within an Order"""
+        order = OrderFactory()
+        order.create()
+        self.assertIsNotNone(order.id)
+        item = ItemFactory(order_id=order.id)
+        item.create()
+        self.assertIsNotNone(item.id)
+        found = Item.find(item.id)
+        self.assertEqual(found.name, item.name)
+        self.assertEqual(found.quantity, item.quantity)
+        self.assertEqual(found.price, item.price)
+        self.assertEqual(found.order_id, order.id)
+
+    def test_delete_item(self):
+        """It should delete an Item"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory(order_id=order.id)
+        item.create()
+        self.assertEqual(len(Item.query.all()), 1)
+        item.delete()
+        self.assertEqual(len(Item.query.all()), 0)
+
+    def test_order_cascade_delete(self):
+        """It should cascade delete Items when an Order is deleted"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory(order_id=order.id)
+        item.create()
+        self.assertEqual(len(Item.query.all()), 1)
+        order.delete()
+        self.assertEqual(len(Item.query.all()), 0)
+
+    def test_deserialize_item_invalid_quantity(self):
+        """It should raise DataValidationError for invalid quantity"""
+        data = {"name": "Widget", "quantity": 0, "price": 9.99}
+        item = Item()
+        self.assertRaises(DataValidationError, item.deserialize, data)
+
+    def test_deserialize_item_invalid_price(self):
+        """It should raise DataValidationError for invalid price"""
+        data = {"name": "Widget", "quantity": 5, "price": -1.0}
+        item = Item()
+        self.assertRaises(DataValidationError, item.deserialize, data)
+
+    def test_order_serialize_with_status(self):
+        """It should serialize an Order with its status"""
+        order = OrderFactory()
+        order.create()
+        data = order.serialize()
+        self.assertEqual(data["status"], order.status)

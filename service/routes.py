@@ -249,3 +249,44 @@ def delete_order(order_id):
 
     app.logger.info("Order with ID: %d delete complete.", order_id)
     return {}, status.HTTP_204_NO_CONTENT
+
+
+######################################################################
+# DELETE AN ITEM FROM AN ORDER
+######################################################################
+@app.route("/orders/<int:order_id>/items/<int:item_id>", methods=["DELETE"])
+def delete_item(order_id, item_id):
+    """
+    Delete an Item from an Order
+
+    This endpoint will delete an Item from an Order based on the order id and item id
+    """
+    app.logger.info(
+        "Request to Delete Item %d from Order %d", item_id, order_id
+    )
+
+    order = Order.find(order_id)
+    if not order:
+        abort(status.HTTP_404_NOT_FOUND, f"Order with id '{order_id}' was not found.")
+
+    if order.status not in ("Pending", "Unprocessed"):
+        abort(
+            status.HTTP_409_CONFLICT,
+            f"Order with id '{order_id}' has status '{order.status}' and cannot have items deleted.",
+        )
+
+    item = None
+    for i in order.items:
+        if i.id == item_id:
+            item = i
+            break
+
+    if not item:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Item with id '{item_id}' was not found in Order '{order_id}'.",
+        )
+
+    item.delete()
+    app.logger.info("Item with ID: %d deleted from Order %d.", item_id, order_id)
+    return {}, status.HTTP_204_NO_CONTENT
