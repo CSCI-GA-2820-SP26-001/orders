@@ -18,6 +18,7 @@ class OrderFactory(factory.Factory):
     name = factory.Faker("name")
     address = factory.Faker("street_address")
     email = factory.Faker("email")
+    status = "Unprocessed"
 
 
 class ItemFactory(factory.Factory):
