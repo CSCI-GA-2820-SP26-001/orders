@@ -75,6 +75,19 @@ class OrderService(TestCase):
         """It should call the home page"""
         resp = self.client.get("/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.get_json()
+        self.assertIn("name", data)
+        self.assertIn("version", data)
+        self.assertIn("paths", data)
+
+    def test_list_orders(self):
+        """It should return a list of all Orders"""
+        for _ in range(3):
+            OrderFactory().create()
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 3)
 
     def test_create_order(self):
         """It should Create a new Order"""
@@ -198,18 +211,18 @@ class OrderService(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_update_order_no_body(self):
-        """It should return 400 when updating with no JSON body"""
+    def test_update_order_no_content_type(self):
+        """It should return 415 when updating without Content-Type"""
         test_order = OrderFactory()
         test_order.create()
 
         response = self.client.put(
             f"{BASE_URL}/{test_order.id}",
-            content_type="application/json",
+            data="not json",
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
-    def test_unsupported_media_type(self):
+    def test_update_order_wrong_content_type(self):
         """It should return 415 when Content-Type is not application/json"""
         test_order = OrderFactory()
         test_order.create()

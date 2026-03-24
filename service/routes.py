@@ -32,8 +32,13 @@ from service.common import status  # HTTP Status Codes
 @app.route("/")
 def index():
     """Root URL response"""
+    app.logger.info("Request for Root URL")
     return (
-        "This is the main page of the order part :)",
+        jsonify(
+            name="Order REST API Service",
+            version="1.0",
+            paths=url_for("list_orders", _external=True),
+        ),
         status.HTTP_200_OK,
     )
 
@@ -42,8 +47,24 @@ def index():
 #  R E S T   A P I   E N D P O I N T S
 ######################################################################
 
-# Todo: Place your REST API code here ...
 
+######################################################################
+# LIST ALL ORDERS
+######################################################################
+@app.route("/orders", methods=["GET"])
+def list_orders():
+    """Returns all of the Orders"""
+    app.logger.info("Request for order list")
+
+    orders = Order.all()
+    results = [order.serialize() for order in orders]
+    app.logger.info("Returning %d orders", len(results))
+    return jsonify(results), status.HTTP_200_OK
+
+
+######################################################################
+# CREATE A NEW ORDER
+######################################################################
 @app.route("/orders", methods=["POST"])
 def create_order():
     """
@@ -99,15 +120,14 @@ def update_orders(order_id):
     This endpoint will update an Order based on its id
     """
     app.logger.info("Request to Update an order with id [%s]", order_id)
+    check_content_type("application/json")
 
     order = Order.find(order_id)
     if not order:
-        abort(status.HTTP_404_NOT_FOUND, f"order with id '{order_id}' was not found.")
+        abort(status.HTTP_404_NOT_FOUND, f"Order with id '{order_id}' was not found.")
 
     data = request.get_json()
-    if not data:
-        abort(status.HTTP_400_BAD_REQUEST, "No data provided")
-
+    app.logger.info("Processing: %s", data)
     order.deserialize(data)
     order.update()
     app.logger.info("Order with id [%s] updated.", order_id)
