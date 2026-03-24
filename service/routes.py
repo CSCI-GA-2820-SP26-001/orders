@@ -167,6 +167,46 @@ def get_order_item(order_id, item_id):
 
 
 ######################################################################
+# UPDATE AN ITEM IN AN ORDER
+######################################################################
+@app.route("/orders/<int:order_id>/items/<int:item_id>", methods=["PUT"])
+def update_order_item(order_id, item_id):
+    """
+    Update an Item in an Order
+
+    This endpoint will update an Item in an Order based on their ids
+    """
+    app.logger.info(
+        "Request to Update item %s in order %s", item_id, order_id
+    )
+    check_content_type("application/json")
+
+    order = Order.find(order_id)
+    if not order:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Order with id '{order_id}' was not found.",
+        )
+
+    item = Item.find(item_id)
+    if not item or item.order_id != order_id:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Item with id '{item_id}' was not found in order '{order_id}'.",
+        )
+
+    data = request.get_json()
+    app.logger.info("Processing: %s", data)
+    item.deserialize(data)
+    item.id = item_id
+    item.order_id = order_id
+    order.update()
+
+    app.logger.info("Item %s in order %s updated.", item_id, order_id)
+    return jsonify(item.serialize()), status.HTTP_200_OK
+
+
+######################################################################
 # UTILITY FUNCTIONS
 ######################################################################
 def check_content_type(content_type) -> None:
