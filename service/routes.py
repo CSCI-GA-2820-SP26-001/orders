@@ -188,3 +188,22 @@ def check_content_type(content_type) -> None:
         status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
         f"Content-Type must be {content_type}",
     )
+# Delete a order with API
+@app.route("/orders/<int:order_id>", methods=["DELETE"])
+def delete_order(order_id):
+    """
+    Delete a Order
+
+    This endpoint will delete a Order based the id specified in the path
+    """
+    app.logger.info(
+        "Request to Delete a order with id [%s]", order_id
+    )
+
+    order = Order.find(order_id)
+    if order:
+        app.logger.info("Order with ID: %d found.", order.id)
+        order.delete()
+
+    app.logger.info("Order with ID: %d delete complete.", order_id)
+    return {}, status.HTTP_204_NO_CONTENT
