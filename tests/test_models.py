@@ -90,6 +90,11 @@ class TestOrder(TestCase):
         found = Order.find(order.id)
         self.assertEqual(found.name, "Updated Name")
 
+    def test_update_order_no_id(self):
+        """It should raise DataValidationError when updating with no ID"""
+        order = Order(name="Test", address="123 St", email="t@t.com")
+        self.assertRaises(DataValidationError, order.update)
+
     def test_delete_order(self):
         """It should delete an Order"""
         order = OrderFactory()
