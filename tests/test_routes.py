@@ -70,6 +70,23 @@ class OrderService(TestCase):
     #  P L A C E   T E S T   C A S E S   H E R E
     ######################################################################
 
+      def _create_orders(self, count: int = 1) -> list:
+        """Factory method to create orders in bulk"""
+        orders = []
+        for _ in range(count):
+            test_order = OrderFactory()
+            response = self.client.post(BASE_URL, json=test_order.serialize())
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_201_CREATED,
+                "Could not create test order",
+            )
+            new_order = response.get_json()
+            test_order.id = new_order["id"]
+            orders.append(test_order)
+        return orders
+
+
     def test_index(self):
         """It should call the home page"""
         resp = self.client.get("/")
