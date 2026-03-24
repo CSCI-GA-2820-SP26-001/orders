@@ -1,0 +1,153 @@
+### 1. Check service is running
+GET http://localhost:8080/
+
+### 2. List orders (should be empty)
+GET http://localhost:8080/orders
+
+##############################################
+# CREATE ORDERS
+##############################################
+
+### 3. Create first order with items
+POST http://localhost:8080/orders
+Content-Type: application/json
+
+{
+  "name": "Alice Johnson",
+  "address": "100 Broadway, New York, NY 10001",
+  "email": "alice@nyu.edu",
+  "items": [
+    {"name": "Laptop", "quantity": 1, "price": 999.99},
+    {"name": "Mouse", "quantity": 2, "price": 29.99},
+    {"name": "USB Cable", "quantity": 3, "price": 9.99}
+  ]
+}
+
+### 4. Create second order without items
+POST http://localhost:8080/orders
+Content-Type: application/json
+
+{
+  "name": "Bob Smith",
+  "address": "200 Park Ave, New York, NY 10003",
+  "email": "bob@nyu.edu"
+}
+
+### 5. Create third order with items
+POST http://localhost:8080/orders
+Content-Type: application/json
+
+{
+  "name": "Charlie Lee",
+  "address": "300 5th Ave, New York, NY 10010",
+  "email": "charlie@nyu.edu",
+  "items": [
+    {"name": "Keyboard", "quantity": 1, "price": 79.99}
+  ]
+}
+
+##############################################
+# READ ORDERS
+##############################################
+
+### 6. List all orders (should show 3)
+GET http://localhost:8080/orders
+
+### 7. Read a specific order by ID
+GET http://localhost:8080/orders/1
+
+##############################################
+# UPDATE AN ORDER
+##############################################
+
+### 8. Update order 2 (change address and email)
+PUT http://localhost:8080/orders/2
+Content-Type: application/json
+
+{
+  "name": "Bob Smith",
+  "address": "250 Mercer St, New York, NY 10012",
+  "email": "bob.smith@nyu.edu"
+}
+
+### 9. Verify the update
+GET http://localhost:8080/orders/2
+
+##############################################
+# ITEM OPERATIONS (Read, Update, Delete)
+##############################################
+
+### 10. Read an item from order 1
+GET http://localhost:8080/orders/1/items/1
+
+### 11. Update an item in order 1 (upgrade Laptop)
+PUT http://localhost:8080/orders/1/items/1
+Content-Type: application/json
+
+{
+  "name": "Laptop Pro",
+  "quantity": 1,
+  "price": 1299.99
+}
+
+### 12. Verify item was updated (check full order)
+GET http://localhost:8080/orders/1
+
+### 13. Delete an item from order 1 (remove USB Cable)
+DELETE http://localhost:8080/orders/1/items/2
+
+### 14. Verify item was deleted (order should have 2 items now)
+GET http://localhost:8080/orders/1
+
+##############################################
+# DELETE AN ORDER
+##############################################
+
+### 15. Delete order 3
+DELETE http://localhost:8080/orders/3
+
+### 16. Verify deletion (should return 404)
+GET http://localhost:8080/orders/3
+
+### 17. List remaining orders (should show 2)
+GET http://localhost:8080/orders
+
+##############################################
+# ERROR HANDLING
+##############################################
+
+### 18. Get non-existent order (404)
+GET http://localhost:8080/orders/999
+
+### 19. Create order with missing fields (400)
+POST http://localhost:8080/orders
+Content-Type: application/json
+
+{
+  "name": "Incomplete Order"
+}
+
+### 20. Send wrong content type (415)
+POST http://localhost:8080/orders
+Content-Type: text/plain
+
+this is not json
+
+### 21. Use unsupported HTTP method (405)
+PATCH http://localhost:8080/orders
+
+### 22. Read non-existent item (404)
+GET http://localhost:8080/orders/1/items/999
+
+### 23. Update non-existent item (404)
+PUT http://localhost:8080/orders/1/items/999
+Content-Type: application/json
+
+{
+  "name": "Ghost",
+  "quantity": 1,
+  "price": 1.0
+}
+
+### 24. Delete item from non-existent order (404)
+DELETE http://localhost:8080/orders/999/items/1
