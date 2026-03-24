@@ -71,7 +71,7 @@ class OrderService(TestCase):
     #  P L A C E   T E S T   C A S E S   H E R E
     ######################################################################
 
-      def _create_orders(self, count: int = 1) -> list:
+    def _create_orders(self, count: int = 1) -> list:
         """Factory method to create orders in bulk"""
         orders = []
         for _ in range(count):
@@ -92,10 +92,13 @@ class OrderService(TestCase):
         """It should call the home page"""
         resp = self.client.get("/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
         data = resp.get_json()
+        self.assertIsNotNone(data)
         self.assertIn("name", data)
         self.assertIn("version", data)
         self.assertIn("paths", data)
+        self.assertEqual(data["paths"]["list_orders"], "/orders")
 
     def test_list_orders(self):
         """It should return a list of all Orders"""
@@ -132,6 +135,7 @@ class OrderService(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+        
     def test_create_order_no_content_type(self):
         """It should return 415 when creating an Order without Content-Type"""
         response = self.client.post(BASE_URL, data="not json")

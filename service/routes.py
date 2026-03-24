@@ -35,9 +35,11 @@ def index():
     app.logger.info("Request for Root URL")
     return (
         jsonify(
-            name="Order REST API Service",
-            version="1.0",
-            paths=url_for("list_orders", _external=True),
+            name = "Orders Service",
+            version="1.0.0",
+            paths = {
+                "list_orders":"/orders"
+            },
         ),
         status.HTTP_200_OK,
     )
