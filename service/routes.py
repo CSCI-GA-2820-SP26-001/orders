@@ -22,7 +22,7 @@ and Delete Order"""
 
 from flask import jsonify, request, url_for, abort
 from flask import current_app as app  # Import Flask application
-from service.models import Order
+from service.models import Order, DataValidationError
 from service.common import status  # HTTP Status Codes
 
 
@@ -33,7 +33,7 @@ from service.common import status  # HTTP Status Codes
 def index():
     """Root URL response"""
     return (
-        "Reminder: return some useful information in json format about the service here",
+        "This is the main page of the order part :)",
         status.HTTP_200_OK,
     )
 
@@ -84,4 +84,30 @@ def get_orders(order_id):
         abort(status.HTTP_404_NOT_FOUND, f"order with id '{order_id}' was not found.")
 
     app.logger.info("Returning order: %s", order.id)
+    return jsonify(order.serialize()), status.HTTP_200_OK
+
+
+######################################################################
+# UPDATE AN EXISTING ORDER
+######################################################################
+@app.route("/orders/<int:order_id>", methods=["PUT"])
+def update_orders(order_id):
+    """
+    Update an Order
+
+    This endpoint will update an Order based on its id
+    """
+    app.logger.info("Request to Update an order with id [%s]", order_id)
+
+    order = Order.find(order_id)
+    if not order:
+        abort(status.HTTP_404_NOT_FOUND, f"order with id '{order_id}' was not found.")
+
+    data = request.get_json()
+    if not data:
+        abort(status.HTTP_400_BAD_REQUEST, "No data provided")
+
+    order.deserialize(data)
+    order.update()
+    app.logger.info("Order with id [%s] updated.", order_id)
     return jsonify(order.serialize()), status.HTTP_200_OK

@@ -22,9 +22,10 @@ Test cases for Pet Model
 import os
 import logging
 from unittest import TestCase
+from unittest.mock import patch
 from wsgi import app
-from service.models import Order, DataValidationError, db
-from .factories import OrderFactory
+from service.models import Order, Item, DataValidationError, db
+from .factories import OrderFactory, ItemFactory
 
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "postgresql+psycopg://postgres:postgres@localhost:5432/testdb"
@@ -54,7 +55,8 @@ class TestOrder(TestCase):
 
     def setUp(self):
         """This runs before each test"""
-        db.session.query(Order).delete()  # clean up the last tests
+        db.session.query(Item).delete()
+        db.session.query(Order).delete()
         db.session.commit()
 
     def tearDown(self):
@@ -77,4 +79,91 @@ class TestOrder(TestCase):
         self.assertEqual(data.address, order.address)
         self.assertEqual(data.email, order.email)
 
-    # Todo: Add your test cases here...
+    def test_update_order(self):
+        """It should update an Order"""
+        order = OrderFactory()
+        order.create()
+        original_id = order.id
+        order.name = "Updated Name"
+        order.update()
+        self.assertEqual(order.id, original_id)
+        found = Order.find(order.id)
+        self.assertEqual(found.name, "Updated Name")
+
+    def test_delete_order(self):
+        """It should delete an Order"""
+        order = OrderFactory()
+        order.create()
+        self.assertEqual(len(Order.all()), 1)
+        order.delete()
+        self.assertEqual(len(Order.all()), 0)
+
+    def test_find_all_orders(self):
+        """It should return all Orders"""
+        for _ in range(3):
+            OrderFactory().create()
+        orders = Order.all()
+        self.assertEqual(len(orders), 3)
+
+    def test_find_by_name(self):
+        """It should find Orders by name"""
+        order = OrderFactory()
+        order.create()
+        found = Order.find_by_name(order.name).all()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].name, order.name)
+
+    def test_deserialize_type_error(self):
+        """It should raise DataValidationError on bad data type"""
+        order = Order()
+        self.assertRaises(DataValidationError, order.deserialize, None)
+
+    def test_order_with_items(self):
+        """It should create an Order with Items"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory.build()
+        item.order_id = order.id
+        order.items.append(item)
+        order.update()
+
+        found = Order.find(order.id)
+        self.assertEqual(len(found.items), 1)
+        self.assertEqual(found.items[0].name, item.name)
+        self.assertEqual(found.items[0].quantity, item.quantity)
+
+    def test_item_repr(self):
+        """It should return a string representation of Item"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory.build()
+        item.order_id = order.id
+        order.items.append(item)
+        order.update()
+        found_item = Item.find(order.items[0].id)
+        self.assertIn("Item", repr(found_item))
+
+    def test_item_deserialize_missing_field(self):
+        """It should raise DataValidationError when Item is missing a field"""
+        item = Item()
+        self.assertRaises(DataValidationError, item.deserialize, {"name": "Widget"})
+
+    def test_item_deserialize_type_error(self):
+        """It should raise DataValidationError on bad Item data type"""
+        item = Item()
+        self.assertRaises(DataValidationError, item.deserialize, None)
+
+    def test_update_order_error(self):
+        """It should raise DataValidationError on update failure"""
+        order = OrderFactory()
+        order.create()
+        order.name = "Updated"
+        with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
+            self.assertRaises(DataValidationError, order.update)
+
+    def test_delete_order_error(self):
+        """It should raise DataValidationError on delete failure"""
+        order = OrderFactory()
+        order.create()
+        with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
+            self.assertRaises(DataValidationError, order.delete)
