@@ -99,3 +99,46 @@ class OrderService(TestCase):
         data = response.get_json()
         logging.debug("Response data = %s", data)
         self.assertIn("was not found", data["message"])
+
+
+    def test_delete_order(self):
+        """It should Delete a order"""
+        # create one order in the database
+        test_order = OrderFactory()
+        test_order.create()
+
+        response = self.client.delete(f"{BASE_URL}/{test_order.id}")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        # make sure the order is deleted
+        response = self.client.get(f"{BASE_URL}/{test_order.id}")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+    @app.route("/orders/<int:order_id>", methods=["PUT"])
+def update_order(order_id):
+    """
+    Update a Order
+
+    This endpoint will update a Order based the body that is posted
+    """
+    app.logger.info(
+        "Request to Update a order with id [%s]", order_id
+    )
+    check_content_type("application/json")
+
+    order = Order.find(order_id)
+    if not order:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Order with id '{order_id}' was not found.",
+        )
+
+    data = request.get_json()
+    app.logger.info("Processing: %s", data)
+    order.deserialize(data)
+
+    order.update()
+
+    app.logger.info("Order with ID: %d updated.", order.id)
+    return jsonify(order.serialize()), status.HTTP_200_OK
