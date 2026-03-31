@@ -95,10 +95,17 @@ class OrderService(TestCase):
 
         data = resp.get_json()
         self.assertIsNotNone(data)
-        self.assertIn("name", data)
+        self.assertEqual(data["name"], "Orders REST API Service")
         self.assertIn("version", data)
         self.assertIn("paths", data)
-        self.assertEqual(data["paths"]["list_orders"], "/orders")
+        self.assertEqual(data["paths"]["list_orders"], "GET /orders")
+        self.assertEqual(data["paths"]["create_order"], "POST /orders")
+        self.assertEqual(data["paths"]["get_order"], "GET /orders/{id}")
+        self.assertEqual(data["paths"]["update_order"], "PUT /orders/{id}")
+        self.assertEqual(data["paths"]["delete_order"], "DELETE /orders/{id}")
+        self.assertEqual(data["paths"]["get_item"], "GET /orders/{id}/items/{item_id}")
+        self.assertEqual(data["paths"]["update_item"], "PUT /orders/{id}/items/{item_id}")
+        self.assertEqual(data["paths"]["delete_item"], "DELETE /orders/{id}/items/{item_id}")
 
     def test_list_orders(self):
         """It should return a list of all Orders"""
@@ -445,7 +452,9 @@ class OrderService(TestCase):
         test_item.create()
 
         response = self.client.delete(f"{BASE_URL}/{test_order.id}/items/{test_item.id}")
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertIn("deleted", data["message"])
 
         self.assertIsNone(Item.find(test_item.id))
 
@@ -457,7 +466,9 @@ class OrderService(TestCase):
         test_item.create()
 
         response = self.client.delete(f"{BASE_URL}/{test_order.id}/items/{test_item.id}")
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertIn("deleted", data["message"])
 
         self.assertIsNone(Item.find(test_item.id))
 
@@ -483,3 +494,12 @@ class OrderService(TestCase):
 
         response = self.client.delete(f"{BASE_URL}/{test_order.id}/items/{test_item.id}")
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    ######################################################################
+    #  E R R O R   H A N D L E R   T E S T S
+    ######################################################################
+
+    def test_method_not_allowed(self):
+        """It should return 405 when using an unsupported HTTP method"""
+        response = self.client.patch(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

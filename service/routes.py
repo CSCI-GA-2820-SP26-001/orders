@@ -35,10 +35,17 @@ def index():
     app.logger.info("Request for Root URL")
     return (
         jsonify(
-            name = "Orders Service",
+            name="Orders REST API Service",
             version="1.0.0",
-            paths = {
-                "list_orders":"/orders"
+            paths={
+                "list_orders": "GET /orders",
+                "create_order": "POST /orders",
+                "get_order": "GET /orders/{id}",
+                "update_order": "PUT /orders/{id}",
+                "delete_order": "DELETE /orders/{id}",
+                "get_item": "GET /orders/{id}/items/{item_id}",
+                "update_item": "PUT /orders/{id}/items/{item_id}",
+                "delete_item": "DELETE /orders/{id}/items/{item_id}",
             },
         ),
         status.HTTP_200_OK,
@@ -289,4 +296,4 @@ def delete_item(order_id, item_id):
 
     item.delete()
     app.logger.info("Item with ID: %d deleted from Order %d.", item_id, order_id)
-    return {}, status.HTTP_204_NO_CONTENT
+    return jsonify(message=f"Item with id '{item_id}' has been deleted from order '{order_id}'."), status.HTTP_200_OK
