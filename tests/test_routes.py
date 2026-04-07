@@ -87,7 +87,6 @@ class OrderService(TestCase):
             orders.append(test_order)
         return orders
 
-
     def test_index(self):
         """It should call the home page"""
         resp = self.client.get("/")
