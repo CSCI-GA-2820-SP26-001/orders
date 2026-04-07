@@ -15,6 +15,7 @@ class OrderFactory(factory.Factory):
         model = Order
 
     id = factory.Sequence(lambda n: n)
+    customer_id = factory.Faker("random_int", min=1, max=10000)
     name = factory.Faker("name")
     address = factory.Faker("street_address")
     email = factory.Faker("email")

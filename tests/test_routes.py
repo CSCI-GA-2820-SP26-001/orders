@@ -87,6 +87,12 @@ class OrderService(TestCase):
             orders.append(test_order)
         return orders
 
+    def test_health(self):
+        """It should return OK from the health endpoint"""
+        resp = self.client.get("/health")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.get_json()
+        self.assertEqual(data["status"], "OK")
 
     def test_index(self):
         """It should call the home page"""
@@ -122,6 +128,7 @@ class OrderService(TestCase):
         response = self.client.post(
             BASE_URL,
             json={
+                "customer_id": test_order.customer_id,
                 "name": test_order.name,
                 "address": test_order.address,
                 "email": test_order.email,
@@ -176,6 +183,7 @@ class OrderService(TestCase):
         test_order.create()
 
         updated_data = {
+            "customer_id": test_order.customer_id,
             "name": "Updated Name",
             "address": test_order.address,
             "email": test_order.email,
@@ -197,6 +205,7 @@ class OrderService(TestCase):
 
         item = ItemFactory.build()
         updated_data = {
+            "customer_id": test_order.customer_id,
             "name": test_order.name,
             "address": test_order.address,
             "email": test_order.email,
@@ -219,7 +228,7 @@ class OrderService(TestCase):
         """It should return 404 when updating an Order that does not exist"""
         response = self.client.put(
             f"{BASE_URL}/0",
-            json={"name": "X", "address": "Y", "email": "z@z.com"},
+            json={"customer_id": 1, "name": "X", "address": "Y", "email": "z@z.com"},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -233,7 +242,7 @@ class OrderService(TestCase):
 
         response = self.client.put(
             f"{BASE_URL}/{test_order.id}",
-            json={"name": "Missing fields"},
+            json={"customer_id": 1, "name": "Missing fields"},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -280,6 +289,7 @@ class OrderService(TestCase):
         test_order.create()
 
         updated_data = {
+            "customer_id": test_order.customer_id,
             "name": "Confirmed Update",
             "address": "123 New St",
             "email": "new@example.com",
@@ -297,6 +307,244 @@ class OrderService(TestCase):
         self.assertEqual(data["name"], "Confirmed Update")
         self.assertEqual(data["address"], "123 New St")
         self.assertEqual(data["email"], "new@example.com")
+
+    ######################################################################
+    #  F I L T E R I N G   &   P A G I N A T I O N   T E S T S
+    ######################################################################
+
+    def test_list_orders_paginated(self):
+        """It should return paginated results with metadata"""
+        for _ in range(5):
+            OrderFactory().create()
+
+        response = self.client.get(f"{BASE_URL}?page=1&limit=2")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["page"], 1)
+        self.assertEqual(data["limit"], 2)
+        self.assertEqual(data["totalCount"], 5)
+        self.assertEqual(data["totalPages"], 3)
+        self.assertEqual(len(data["results"]), 2)
+
+    def test_list_orders_paginated_last_page(self):
+        """It should return remaining orders on the last page"""
+        for _ in range(5):
+            OrderFactory().create()
+
+        response = self.client.get(f"{BASE_URL}?page=3&limit=2")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["totalPages"], 3)
+
+    def test_list_orders_filter_by_status(self):
+        """It should filter orders by status"""
+        OrderFactory(status="Pending").create()
+        OrderFactory(status="Pending").create()
+        OrderFactory(status="Completed").create()
+
+        response = self.client.get(f"{BASE_URL}?status=Pending")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 2)
+        for order in data:
+            self.assertEqual(order["status"], "Pending")
+
+    def test_list_orders_filter_by_customer_id(self):
+        """It should filter orders by customer_id"""
+        OrderFactory(customer_id=42).create()
+        OrderFactory(customer_id=42).create()
+        OrderFactory(customer_id=99).create()
+
+        response = self.client.get(f"{BASE_URL}?customer_id=42")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 2)
+        for order in data:
+            self.assertEqual(order["customer_id"], 42)
+
+    def test_list_orders_filter_combined_with_pagination(self):
+        """It should filter and paginate at the same time"""
+        for _ in range(4):
+            OrderFactory(status="Pending", customer_id=10).create()
+        OrderFactory(status="Completed", customer_id=10).create()
+
+        response = self.client.get(f"{BASE_URL}?status=Pending&customer_id=10&page=1&limit=2")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["totalCount"], 4)
+        self.assertEqual(data["totalPages"], 2)
+        self.assertEqual(len(data["results"]), 2)
+
+    def test_list_orders_invalid_page(self):
+        """It should return 400 for invalid page parameter"""
+        response = self.client.get(f"{BASE_URL}?page=abc&limit=10")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_orders_invalid_limit(self):
+        """It should return 400 for invalid limit parameter"""
+        response = self.client.get(f"{BASE_URL}?page=1&limit=xyz")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_orders_negative_page(self):
+        """It should return 400 for page < 1"""
+        response = self.client.get(f"{BASE_URL}?page=0&limit=10")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_orders_negative_limit(self):
+        """It should return 400 for limit < 1"""
+        response = self.client.get(f"{BASE_URL}?page=1&limit=0")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_orders_invalid_customer_id(self):
+        """It should return 400 for non-integer customer_id"""
+        response = self.client.get(f"{BASE_URL}?customer_id=abc")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_orders_filter_by_name(self):
+        """It should filter orders by name"""
+        order = OrderFactory(name="Alice Smith")
+        order.create()
+        OrderFactory(name="Bob Jones").create()
+
+        response = self.client.get(f"{BASE_URL}?name=Alice Smith")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["name"], "Alice Smith")
+
+    def test_list_orders_filter_by_created_after(self):
+        """It should filter orders created after a given date"""
+        order = OrderFactory()
+        order.create()
+        response = self.client.get(f"{BASE_URL}?created_after=2000-01-01T00:00:00")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 1)
+
+    def test_list_orders_filter_by_created_before(self):
+        """It should filter orders created before a given date"""
+        OrderFactory().create()
+        response = self.client.get(f"{BASE_URL}?created_before=2000-01-01T00:00:00")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 0)
+
+    def test_list_orders_invalid_created_after(self):
+        """It should return 400 for invalid created_after format"""
+        response = self.client.get(f"{BASE_URL}?created_after=not-a-date")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_orders_invalid_created_before(self):
+        """It should return 400 for invalid created_before format"""
+        response = self.client.get(f"{BASE_URL}?created_before=not-a-date")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_orders_filter_by_total_min(self):
+        """It should filter orders with total >= total_min"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory(order_id=order.id, quantity=2, price=50.0)
+        item.create()
+
+        response = self.client.get(f"{BASE_URL}?total_min=50")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 1)
+
+        response = self.client.get(f"{BASE_URL}?total_min=200")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 0)
+
+    def test_list_orders_filter_by_total_max(self):
+        """It should filter orders with total <= total_max"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory(order_id=order.id, quantity=2, price=50.0)
+        item.create()
+
+        response = self.client.get(f"{BASE_URL}?total_max=150")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 1)
+
+        response = self.client.get(f"{BASE_URL}?total_max=50")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 0)
+
+    def test_list_orders_invalid_total_min(self):
+        """It should return 400 for non-numeric total_min"""
+        response = self.client.get(f"{BASE_URL}?total_min=abc")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_orders_invalid_total_max(self):
+        """It should return 400 for non-numeric total_max"""
+        response = self.client.get(f"{BASE_URL}?total_max=abc")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_orders_no_filters_returns_all(self):
+        """It should return all orders when no filters are provided"""
+        for _ in range(3):
+            OrderFactory().create()
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 3)
+
+    def test_list_orders_filters_no_match_returns_empty(self):
+        """It should return 200 with empty list when filters match nothing"""
+        OrderFactory(status="Pending").create()
+        response = self.client.get(f"{BASE_URL}?status=DoesNotExist")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 0)
+
+    ######################################################################
+    #  C A N C E L   O R D E R   A C T I O N   T E S T S
+    ######################################################################
+
+    def test_cancel_order_success(self):
+        """It should cancel an Unprocessed order"""
+        order = OrderFactory(status="Unprocessed")
+        order.create()
+
+        response = self.client.put(f"{BASE_URL}/{order.id}/cancel")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["status"], "Cancelled")
+
+    def test_cancel_order_pending(self):
+        """It should cancel a Pending order"""
+        order = OrderFactory(status="Pending")
+        order.create()
+
+        response = self.client.put(f"{BASE_URL}/{order.id}/cancel")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["status"], "Cancelled")
+
+    def test_cancel_order_already_completed(self):
+        """It should return 409 when cancelling a Completed order"""
+        order = OrderFactory(status="Completed")
+        order.create()
+
+        response = self.client.put(f"{BASE_URL}/{order.id}/cancel")
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_cancel_order_already_cancelled(self):
+        """It should return 409 when cancelling an already Cancelled order"""
+        order = OrderFactory(status="Cancelled")
+        order.create()
+
+        response = self.client.put(f"{BASE_URL}/{order.id}/cancel")
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_cancel_order_not_found(self):
+        """It should return 404 when cancelling a non-existent order"""
+        response = self.client.put(f"{BASE_URL}/0/cancel")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     ######################################################################
     #  I T E M   T E S T   C A S E S
@@ -346,7 +594,7 @@ class OrderService(TestCase):
 
     def test_get_item_wrong_order(self):
         """It should return 404 when the Item belongs to a different Order"""
-        order1, item = self._create_order_with_item()
+        _, item = self._create_order_with_item()
         order2 = OrderFactory()
         order2.create()
 
@@ -408,7 +656,7 @@ class OrderService(TestCase):
 
     def test_update_item_wrong_order(self):
         """It should return 404 when the Item belongs to a different Order"""
-        order1, item = self._create_order_with_item()
+        _, item = self._create_order_with_item()
         order2 = OrderFactory()
         order2.create()
 
