@@ -24,7 +24,7 @@ import logging
 from unittest import TestCase
 from unittest.mock import patch
 from wsgi import app
-from service.models import Order, Item, DataValidationError, db
+from service.models import Order, Item, DataValidationError, db, VALID_STATUSES
 from .factories import OrderFactory, ItemFactory
 
 DATABASE_URI = os.getenv(
@@ -285,7 +285,6 @@ class TestOrder(TestCase):
 
     def test_deserialize_valid_statuses(self):
         """It should accept all valid status values"""
-        from service.models import VALID_STATUSES
         for valid_status in VALID_STATUSES:
             order = Order()
             data = {
