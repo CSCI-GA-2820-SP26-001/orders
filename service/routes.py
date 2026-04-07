@@ -20,10 +20,22 @@ Order Service
 This service implements a REST API that allows you to Create, Read, Update
 and Delete Order"""
 
+import math
+from datetime import datetime
 from flask import jsonify, request, url_for, abort
 from flask import current_app as app  # Import Flask application
-from service.models import Order, Item, DataValidationError
+from sqlalchemy import func
+from service.models import Order, Item, db
 from service.common import status  # HTTP Status Codes
+
+
+######################################################################
+# HEALTH CHECK
+######################################################################
+@app.route("/health")
+def health():
+    """Health check endpoint for Kubernetes probes"""
+    return jsonify(status="OK"), status.HTTP_200_OK
 
 
 ######################################################################
@@ -60,12 +72,109 @@ def index():
 ######################################################################
 # LIST ALL ORDERS
 ######################################################################
+def _parse_int_param(name):
+    """Parse an optional integer query parameter, abort 400 if invalid"""
+    value = request.args.get(name)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        abort(status.HTTP_400_BAD_REQUEST, f"Invalid query parameter: '{name}' must be an integer")
+
+
+def _parse_float_param(name):
+    """Parse an optional float query parameter, abort 400 if invalid"""
+    value = request.args.get(name)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        abort(status.HTTP_400_BAD_REQUEST, f"Invalid query parameter: '{name}' must be a number")
+
+
+def _parse_date_param(name):
+    """Parse an optional ISO 8601 date query parameter, abort 400 if invalid"""
+    value = request.args.get(name)
+    if value is None:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        abort(status.HTTP_400_BAD_REQUEST, f"Invalid query parameter: '{name}' must be ISO 8601 format")
+
+
+def _apply_filters(query):
+    """Apply query string filters to an Order query"""
+    order_status = request.args.get("status")
+    customer_id = _parse_int_param("customer_id")
+    name = request.args.get("name")
+    created_after = _parse_date_param("created_after")
+    created_before = _parse_date_param("created_before")
+    total_min = _parse_float_param("total_min")
+    total_max = _parse_float_param("total_max")
+
+    if order_status:
+        query = query.filter(Order.status == order_status)
+    if customer_id is not None:
+        query = query.filter(Order.customer_id == customer_id)
+    if name:
+        query = query.filter(Order.name == name)
+    if created_after is not None:
+        query = query.filter(Order.created_at >= created_after)
+    if created_before is not None:
+        query = query.filter(Order.created_at <= created_before)
+
+    if total_min is not None or total_max is not None:
+        order_total = (
+            db.session.query(
+                Item.order_id,
+                func.sum(Item.quantity * Item.price).label("total"),
+            )
+            .group_by(Item.order_id)
+            .subquery()
+        )
+        query = query.outerjoin(order_total, Order.id == order_total.c.order_id)
+        if total_min is not None:
+            query = query.filter(func.coalesce(order_total.c.total, 0) >= total_min)
+        if total_max is not None:
+            query = query.filter(func.coalesce(order_total.c.total, 0) <= total_max)
+
+    return query
+
+
 @app.route("/orders", methods=["GET"])
 def list_orders():
     """Returns all of the Orders"""
     app.logger.info("Request for order list")
 
-    orders = Order.all()
+    page = _parse_int_param("page")
+    limit = _parse_int_param("limit")
+
+    if page is not None and page < 1:
+        abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'page' must be >= 1")
+    if limit is not None and limit < 1:
+        abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'limit' must be >= 1")
+
+    query = _apply_filters(Order.query)
+
+    if page is not None and limit is not None:
+        total_count = query.count()
+        total_pages = math.ceil(total_count / limit) if total_count > 0 else 0
+        orders = query.offset((page - 1) * limit).limit(limit).all()
+        results = [order.serialize() for order in orders]
+
+        app.logger.info("Returning page %d of %d orders", page, total_count)
+        return jsonify({
+            "results": results,
+            "page": page,
+            "limit": limit,
+            "totalCount": total_count,
+            "totalPages": total_pages,
+        }), status.HTTP_200_OK
+
+    orders = query.all()
     results = [order.serialize() for order in orders]
     app.logger.info("Returning %d orders", len(results))
     return jsonify(results), status.HTTP_200_OK
@@ -99,6 +208,7 @@ def create_order():
         status.HTTP_201_CREATED,
         {"Location": location_url},
     )
+
 
 @app.route("/orders/<int:order_id>", methods=["GET"])
 def get_orders(order_id):
@@ -216,6 +326,30 @@ def update_order_item(order_id, item_id):
 
 
 ######################################################################
+# CANCEL AN ORDER
+######################################################################
+@app.route("/orders/<int:order_id>/cancel", methods=["PUT"])
+def cancel_order(order_id):
+    """Cancel an Order"""
+    app.logger.info("Request to Cancel order with id [%s]", order_id)
+
+    order = Order.find(order_id)
+    if not order:
+        abort(status.HTTP_404_NOT_FOUND, f"Order with id '{order_id}' was not found.")
+
+    if order.status in ("Completed", "Cancelled"):
+        abort(
+            status.HTTP_409_CONFLICT,
+            f"Order with id '{order_id}' has status '{order.status}' and cannot be cancelled.",
+        )
+
+    order.status = "Cancelled"
+    order.update()
+    app.logger.info("Order with id [%s] has been cancelled.", order_id)
+    return jsonify(order.serialize()), status.HTTP_200_OK
+
+
+######################################################################
 # UTILITY FUNCTIONS
 ######################################################################
 def check_content_type(content_type) -> None:
@@ -237,7 +371,8 @@ def check_content_type(content_type) -> None:
         status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
         f"Content-Type must be {content_type}",
     )
-# Delete a order with API
+
+
 @app.route("/orders/<int:order_id>", methods=["DELETE"])
 def delete_order(order_id):
     """
