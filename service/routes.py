@@ -30,6 +30,15 @@ from service.common import status  # HTTP Status Codes
 
 
 ######################################################################
+# HEALTH CHECK
+######################################################################
+@app.route("/health")
+def health():
+    """Health check endpoint for Kubernetes probes"""
+    return jsonify(status="OK"), status.HTTP_200_OK
+
+
+######################################################################
 # GET INDEX
 ######################################################################
 @app.route("/")
