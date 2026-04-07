@@ -17,6 +17,16 @@ class DataValidationError(Exception):
     """Used for an data validation errors when deserializing"""
 
 
+VALID_STATUSES = ["Pending", "Paid", "Shipped", "Cancelled"]
+
+VALID_TRANSITIONS = {
+    "Pending": ["Paid", "Cancelled"],
+    "Paid": ["Shipped", "Cancelled"],
+    "Shipped": [],
+    "Cancelled": [],
+}
+
+
 class Order(db.Model):
     """
     Class that represents a Order"""
@@ -29,9 +39,11 @@ class Order(db.Model):
     name = db.Column(db.String(63))
     address = db.Column(db.String(256))
     email = db.Column(db.String(256))
-    status = db.Column(db.String(64), nullable=False, default="Unprocessed")
+    status = db.Column(db.String(64), nullable=False, default="Pending")
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    items = db.relationship("Item", backref="order", cascade="all, delete-orphan", lazy=True)
+    items = db.relationship(
+        "Item", backref="order", cascade="all, delete-orphan", lazy=True
+    )
 
     def __repr__(self):
         return f"<Order {self.name} id=[{self.id}]>"
@@ -100,7 +112,12 @@ class Order(db.Model):
             self.name = data["name"]
             self.address = data["address"]
             self.email = data["email"]
-            self.status = data.get("status", "Unprocessed")
+            new_status = data.get("status", "Pending")
+            if new_status not in VALID_STATUSES:
+                raise DataValidationError(
+                    f"Invalid status '{new_status}'. Must be one of: {', '.join(VALID_STATUSES)}"
+                )
+            self.status = new_status
             if "items" in data:
                 self.items = []
                 for item_data in data["items"]:
@@ -233,7 +250,9 @@ class Item(db.Model):
             ) from error
 
         if not isinstance(self.quantity, int) or self.quantity <= 0:
-            raise DataValidationError("Invalid Item: quantity must be a positive integer")
+            raise DataValidationError(
+                "Invalid Item: quantity must be a positive integer"
+            )
         if not isinstance(self.price, (int, float)) or self.price <= 0:
             raise DataValidationError("Invalid Item: price must be a positive number")
 

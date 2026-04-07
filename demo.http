@@ -4,9 +4,9 @@ GET http://localhost:8080/
 ### 2. List orders (should be empty)
 GET http://localhost:8080/orders
 
-##############################################
+
+
 # CREATE ORDERS
-##############################################
 
 ### 3. Create first order with items
 POST http://localhost:8080/orders
@@ -46,9 +46,13 @@ Content-Type: application/json
   ]
 }
 
-##############################################
+
+
+
+
+
+
 # READ ORDERS
-##############################################
 
 ### 6. List all orders (should show 3)
 GET http://localhost:8080/orders
@@ -56,9 +60,13 @@ GET http://localhost:8080/orders
 ### 7. Read a specific order by ID
 GET http://localhost:8080/orders/1
 
-##############################################
+
+
+
+
+
+
 # UPDATE AN ORDER
-##############################################
 
 ### 8. Update order 2 (change address and email)
 PUT http://localhost:8080/orders/2
@@ -73,9 +81,12 @@ Content-Type: application/json
 ### 9. Verify the update
 GET http://localhost:8080/orders/2
 
-##############################################
+
+
+
+
+
 # ITEM OPERATIONS (Read, Update, Delete)
-##############################################
 
 ### 10. Read an item from order 1
 GET http://localhost:8080/orders/1/items/1
@@ -99,10 +110,13 @@ DELETE http://localhost:8080/orders/1/items/2
 ### 14. Verify item was deleted (order should have 2 items now)
 GET http://localhost:8080/orders/1
 
-##############################################
-# DELETE AN ORDER
-##############################################
 
+
+
+
+
+
+# DELETE AN ORDER
 ### 15. Delete order 3
 DELETE http://localhost:8080/orders/3
 
@@ -112,9 +126,13 @@ GET http://localhost:8080/orders/3
 ### 17. List remaining orders (should show 2)
 GET http://localhost:8080/orders
 
-##############################################
+
+
+
+
+
+
 # ERROR HANDLING
-##############################################
 
 ### 18. Get non-existent order (404)
 GET http://localhost:8080/orders/999
