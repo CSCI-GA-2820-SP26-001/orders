@@ -225,3 +225,41 @@ class TestOrder(TestCase):
         order.create()
         data = order.serialize()
         self.assertEqual(data["status"], order.status)
+
+    def test_create_order_error(self):
+        """It should raise DataValidationError on create failure"""
+        order = OrderFactory()
+        with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
+            self.assertRaises(DataValidationError, order.create)
+
+    def test_deserialize_attribute_error(self):
+        """It should raise DataValidationError on attribute error"""
+        order = Order()
+        self.assertRaises(DataValidationError, order.deserialize, [])
+
+    def test_create_item_error(self):
+        """It should raise DataValidationError on Item create failure"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory(order_id=order.id)
+        with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
+            self.assertRaises(DataValidationError, item.create)
+
+    def test_update_item_error(self):
+        """It should raise DataValidationError on Item update failure"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory(order_id=order.id)
+        item.create()
+        item.name = "Updated"
+        with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
+            self.assertRaises(DataValidationError, item.update)
+
+    def test_delete_item_error(self):
+        """It should raise DataValidationError on Item delete failure"""
+        order = OrderFactory()
+        order.create()
+        item = ItemFactory(order_id=order.id)
+        item.create()
+        with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
+            self.assertRaises(DataValidationError, item.delete)
