@@ -4,6 +4,7 @@ All of the models are stored in this module
 """
 
 import logging
+from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
 
 logger = logging.getLogger("flask.app")
@@ -24,10 +25,12 @@ class Order(db.Model):
     # Table Schema
     ##################################################
     id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, nullable=False)
     name = db.Column(db.String(63))
     address = db.Column(db.String(256))
     email = db.Column(db.String(256))
     status = db.Column(db.String(64), nullable=False, default="Unprocessed")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     items = db.relationship("Item", backref="order", cascade="all, delete-orphan", lazy=True)
 
     def __repr__(self):
@@ -76,10 +79,12 @@ class Order(db.Model):
         """Serializes a Order into a dictionary"""
         return {
             "id": self.id,
+            "customer_id": self.customer_id,
             "name": self.name,
             "address": self.address,
             "email": self.email,
             "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
             "items": [item.serialize() for item in self.items],
         }
 
@@ -91,6 +96,7 @@ class Order(db.Model):
             data (dict): A dictionary containing the resource data
         """
         try:
+            self.customer_id = data["customer_id"]
             self.name = data["name"]
             self.address = data["address"]
             self.email = data["email"]
@@ -138,6 +144,16 @@ class Order(db.Model):
         """
         logger.info("Processing name query for %s ...", name)
         return cls.query.filter(cls.name == name)
+
+    @classmethod
+    def find_by_status(cls, order_status):
+        logger.info("Processing status query for %s ...", order_status)
+        return cls.query.filter(cls.status == order_status)
+
+    @classmethod
+    def find_by_customer_id(cls, customer_id):
+        logger.info("Processing customer_id query for %s ...", customer_id)
+        return cls.query.filter(cls.customer_id == customer_id)
 
 
 class Item(db.Model):

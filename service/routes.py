@@ -20,9 +20,12 @@ Order Service
 This service implements a REST API that allows you to Create, Read, Update
 and Delete Order"""
 
+import math
+from datetime import datetime
 from flask import jsonify, request, url_for, abort
 from flask import current_app as app  # Import Flask application
-from service.models import Order, Item, DataValidationError
+from sqlalchemy import func
+from service.models import Order, Item, DataValidationError, db
 from service.common import status  # HTTP Status Codes
 
 
@@ -65,7 +68,124 @@ def list_orders():
     """Returns all of the Orders"""
     app.logger.info("Request for order list")
 
-    orders = Order.all()
+    page_str = request.args.get("page")
+    limit_str = request.args.get("limit")
+
+    page = None
+    limit = None
+
+    if page_str is not None:
+        try:
+            page = int(page_str)
+        except ValueError:
+            abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'page' must be an integer")
+        if page < 1:
+            abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'page' must be >= 1")
+
+    if limit_str is not None:
+        try:
+            limit = int(limit_str)
+        except ValueError:
+            abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'limit' must be an integer")
+        if limit < 1:
+            abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'limit' must be >= 1")
+
+    order_status = request.args.get("status")
+    customer_id_str = request.args.get("customer_id")
+    name = request.args.get("name")
+    created_after_str = request.args.get("created_after")
+    created_before_str = request.args.get("created_before")
+    total_min_str = request.args.get("total_min")
+    total_max_str = request.args.get("total_max")
+
+    if customer_id_str is not None:
+        try:
+            customer_id = int(customer_id_str)
+        except ValueError:
+            abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'customer_id' must be an integer")
+    else:
+        customer_id = None
+
+    if created_after_str is not None:
+        try:
+            created_after = datetime.fromisoformat(created_after_str)
+        except ValueError:
+            abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'created_after' must be ISO 8601 format")
+    else:
+        created_after = None
+
+    if created_before_str is not None:
+        try:
+            created_before = datetime.fromisoformat(created_before_str)
+        except ValueError:
+            abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'created_before' must be ISO 8601 format")
+    else:
+        created_before = None
+
+    if total_min_str is not None:
+        try:
+            total_min = float(total_min_str)
+        except ValueError:
+            abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'total_min' must be a number")
+    else:
+        total_min = None
+
+    if total_max_str is not None:
+        try:
+            total_max = float(total_max_str)
+        except ValueError:
+            abort(status.HTTP_400_BAD_REQUEST, "Invalid query parameter: 'total_max' must be a number")
+    else:
+        total_max = None
+
+    query = Order.query
+
+    if order_status:
+        query = query.filter(Order.status == order_status)
+
+    if customer_id is not None:
+        query = query.filter(Order.customer_id == customer_id)
+
+    if name:
+        query = query.filter(Order.name == name)
+
+    if created_after is not None:
+        query = query.filter(Order.created_at >= created_after)
+
+    if created_before is not None:
+        query = query.filter(Order.created_at <= created_before)
+
+    if total_min is not None or total_max is not None:
+        order_total = (
+            db.session.query(
+                Item.order_id,
+                func.sum(Item.quantity * Item.price).label("total"),
+            )
+            .group_by(Item.order_id)
+            .subquery()
+        )
+        query = query.outerjoin(order_total, Order.id == order_total.c.order_id)
+        if total_min is not None:
+            query = query.filter(func.coalesce(order_total.c.total, 0) >= total_min)
+        if total_max is not None:
+            query = query.filter(func.coalesce(order_total.c.total, 0) <= total_max)
+
+    if page is not None and limit is not None:
+        total_count = query.count()
+        total_pages = math.ceil(total_count / limit) if total_count > 0 else 0
+        orders = query.offset((page - 1) * limit).limit(limit).all()
+        results = [order.serialize() for order in orders]
+
+        app.logger.info("Returning page %d of %d orders", page, total_count)
+        return jsonify({
+            "results": results,
+            "page": page,
+            "limit": limit,
+            "totalCount": total_count,
+            "totalPages": total_pages,
+        }), status.HTTP_200_OK
+
+    orders = query.all()
     results = [order.serialize() for order in orders]
     app.logger.info("Returning %d orders", len(results))
     return jsonify(results), status.HTTP_200_OK
@@ -213,6 +333,30 @@ def update_order_item(order_id, item_id):
 
     app.logger.info("Item %s in order %s updated.", item_id, order_id)
     return jsonify(item.serialize()), status.HTTP_200_OK
+
+
+######################################################################
+# CANCEL AN ORDER
+######################################################################
+@app.route("/orders/<int:order_id>/cancel", methods=["PUT"])
+def cancel_order(order_id):
+    """Cancel an Order"""
+    app.logger.info("Request to Cancel order with id [%s]", order_id)
+
+    order = Order.find(order_id)
+    if not order:
+        abort(status.HTTP_404_NOT_FOUND, f"Order with id '{order_id}' was not found.")
+
+    if order.status in ("Completed", "Cancelled"):
+        abort(
+            status.HTTP_409_CONFLICT,
+            f"Order with id '{order_id}' has status '{order.status}' and cannot be cancelled.",
+        )
+
+    order.status = "Cancelled"
+    order.update()
+    app.logger.info("Order with id [%s] has been cancelled.", order_id)
+    return jsonify(order.serialize()), status.HTTP_200_OK
 
 
 ######################################################################
