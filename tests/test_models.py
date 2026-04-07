@@ -263,3 +263,37 @@ class TestOrder(TestCase):
         item.create()
         with patch("service.models.db.session.commit", side_effect=Exception("DB error")):
             self.assertRaises(DataValidationError, item.delete)
+
+    def test_order_default_status_is_pending(self):
+        """It should set Pending as the default status when saved to the database"""
+        order = Order(customer_id=1, name="Test", address="123 St", email="t@t.com")
+        order.create()
+        found = Order.find(order.id)
+        self.assertEqual(found.status, "Pending")
+
+    def test_deserialize_invalid_status_raises_error(self):
+        """It should raise DataValidationError for an invalid status value"""
+        order = Order()
+        data = {
+            "customer_id": 1,
+            "name": "Test",
+            "address": "123 St",
+            "email": "t@t.com",
+            "status": "InvalidStatus",
+        }
+        self.assertRaises(DataValidationError, order.deserialize, data)
+
+    def test_deserialize_valid_statuses(self):
+        """It should accept all valid status values"""
+        from service.models import VALID_STATUSES
+        for valid_status in VALID_STATUSES:
+            order = Order()
+            data = {
+                "customer_id": 1,
+                "name": "Test",
+                "address": "123 St",
+                "email": "t@t.com",
+                "status": valid_status,
+            }
+            order.deserialize(data)
+            self.assertEqual(order.status, valid_status)

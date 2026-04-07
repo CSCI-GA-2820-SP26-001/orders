@@ -341,7 +341,7 @@ class OrderService(TestCase):
         """It should filter orders by status"""
         OrderFactory(status="Pending").create()
         OrderFactory(status="Pending").create()
-        OrderFactory(status="Completed").create()
+        OrderFactory(status="Shipped").create()
 
         response = self.client.get(f"{BASE_URL}?status=Pending")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -367,7 +367,7 @@ class OrderService(TestCase):
         """It should filter and paginate at the same time"""
         for _ in range(4):
             OrderFactory(status="Pending", customer_id=10).create()
-        OrderFactory(status="Completed", customer_id=10).create()
+        OrderFactory(status="Shipped", customer_id=10).create()
 
         response = self.client.get(f"{BASE_URL}?status=Pending&customer_id=10&page=1&limit=2")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -506,8 +506,8 @@ class OrderService(TestCase):
     ######################################################################
 
     def test_cancel_order_success(self):
-        """It should cancel an Unprocessed order"""
-        order = OrderFactory(status="Unprocessed")
+        """It should cancel a Pending order"""
+        order = OrderFactory(status="Pending")
         order.create()
 
         response = self.client.put(f"{BASE_URL}/{order.id}/cancel")
@@ -525,9 +525,9 @@ class OrderService(TestCase):
         data = response.get_json()
         self.assertEqual(data["status"], "Cancelled")
 
-    def test_cancel_order_already_completed(self):
-        """It should return 409 when cancelling a Completed order"""
-        order = OrderFactory(status="Completed")
+    def test_cancel_order_already_shipped(self):
+        """It should return 409 when cancelling a Shipped order"""
+        order = OrderFactory(status="Shipped")
         order.create()
 
         response = self.client.put(f"{BASE_URL}/{order.id}/cancel")
@@ -545,6 +545,93 @@ class OrderService(TestCase):
         """It should return 404 when cancelling a non-existent order"""
         response = self.client.put(f"{BASE_URL}/0/cancel")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    ######################################################################
+    #  S T A T U S   W O R K F L O W   T E S T S
+    ######################################################################
+
+    def test_order_default_status_is_pending(self):
+        """It should assign Pending as the default status on creation"""
+        order = OrderFactory()
+        data = order.serialize()
+        data.pop("status", None)
+        response = self.client.post(BASE_URL, json=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.get_json()["status"], "Pending")
+
+    def test_update_order_valid_transition_pending_to_paid(self):
+        """It should allow a valid Pending -> Paid transition"""
+        orders = self._create_orders(1)
+        order = orders[0]
+        payload = order.serialize()
+        payload["status"] = "Paid"
+        response = self.client.put(f"{BASE_URL}/{order.id}", json=payload)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json()["status"], "Paid")
+
+    def test_update_order_valid_transition_paid_to_shipped(self):
+        """It should allow a valid Paid -> Shipped transition"""
+        order = OrderFactory(status="Paid")
+        order.create()
+        payload = order.serialize()
+        payload["status"] = "Shipped"
+        response = self.client.put(f"{BASE_URL}/{order.id}", json=payload)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json()["status"], "Shipped")
+
+    def test_update_order_invalid_transition_pending_to_shipped(self):
+        """It should reject an invalid Pending -> Shipped transition"""
+        orders = self._create_orders(1)
+        order = orders[0]
+        payload = order.serialize()
+        payload["status"] = "Shipped"
+        response = self.client.put(f"{BASE_URL}/{order.id}", json=payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_update_order_invalid_transition_from_cancelled(self):
+        """It should reject any transition out of Cancelled"""
+        order = OrderFactory(status="Cancelled")
+        order.create()
+        payload = order.serialize()
+        payload["status"] = "Pending"
+        response = self.client.put(f"{BASE_URL}/{order.id}", json=payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_update_order_invalid_transition_from_shipped(self):
+        """It should reject any transition out of Shipped"""
+        order = OrderFactory(status="Shipped")
+        order.create()
+        payload = order.serialize()
+        payload["status"] = "Paid"
+        response = self.client.put(f"{BASE_URL}/{order.id}", json=payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_order_invalid_status_value(self):
+        """It should return 400 when creating an order with an invalid status"""
+        order = OrderFactory()
+        payload = order.serialize()
+        payload["status"] = "InvalidStatus"
+        response = self.client.post(BASE_URL, json=payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_update_order_invalid_status_value(self):
+        """It should return 400 when updating an order with an invalid status value"""
+        orders = self._create_orders(1)
+        order = orders[0]
+        payload = order.serialize()
+        payload["status"] = "Bogus"
+        response = self.client.put(f"{BASE_URL}/{order.id}", json=payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_status_included_in_order_response(self):
+        """It should include status in order API response"""
+        orders = self._create_orders(1)
+        order = orders[0]
+        response = self.client.get(f"{BASE_URL}/{order.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertIn("status", data)
+        self.assertEqual(data["status"], "Pending")
 
     ######################################################################
     #  I T E M   T E S T   C A S E S

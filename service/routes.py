@@ -25,7 +25,7 @@ from datetime import datetime
 from flask import jsonify, request, url_for, abort
 from flask import current_app as app  # Import Flask application
 from sqlalchemy import func
-from service.models import Order, Item, db
+from service.models import Order, Item, db, VALID_TRANSITIONS
 from service.common import status  # HTTP Status Codes
 
 
@@ -247,6 +247,16 @@ def update_orders(order_id):
 
     data = request.get_json()
     app.logger.info("Processing: %s", data)
+
+    new_status = data.get("status")
+    if new_status and new_status != order.status:
+        allowed = VALID_TRANSITIONS.get(order.status, [])
+        if new_status not in allowed:
+            abort(
+                status.HTTP_400_BAD_REQUEST,
+                f"Invalid status transition from '{order.status}' to '{new_status}'.",
+            )
+
     order.deserialize(data)
     order.update()
     app.logger.info("Order with id [%s] updated.", order_id)
@@ -337,7 +347,7 @@ def cancel_order(order_id):
     if not order:
         abort(status.HTTP_404_NOT_FOUND, f"Order with id '{order_id}' was not found.")
 
-    if order.status in ("Completed", "Cancelled"):
+    if order.status in ("Shipped", "Cancelled"):
         abort(
             status.HTTP_409_CONFLICT,
             f"Order with id '{order_id}' has status '{order.status}' and cannot be cancelled.",

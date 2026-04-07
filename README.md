@@ -56,7 +56,6 @@ All endpoints return JSON responses. Write operations (`POST`, `PUT`) require `C
 | `PUT`    | `/orders/{id}/items/{item_id}`       | Update an item      | `{name, quantity, price}`       | `200 OK`         |
 | `DELETE` | `/orders/{id}/items/{item_id}`       | Delete an item      | None                            | `200 OK`         |
 
-> **Note:** Delete item only works when the order status is `Pending` or `Unprocessed`. Otherwise it returns `409 Conflict`.
 
 ### Request / Response Examples
 
@@ -124,11 +123,8 @@ Response (`201 Created`):
 ### Running the Service
 
 ```bash
-# Install dependencies
-make install
-
-# Start the service (uses honcho/Procfile)
-make run
+#inside the container
+flask run
 ```
 
 The service will be available at `http://localhost:8080`.
@@ -139,15 +135,6 @@ The service will be available at `http://localhost:8080`.
 make test
 ```
 
-This runs the full test suite with `pytest` and enforces a minimum **95% code coverage** threshold.
-
-### Linting
-
-```bash
-make lint
-```
-
-Runs `flake8` and `pylint` against the `service/` and `tests/` directories.
 
 ## Project Structure
 
