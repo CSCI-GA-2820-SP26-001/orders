@@ -587,7 +587,7 @@ class OrderService(TestCase):
 
     def test_get_item_wrong_order(self):
         """It should return 404 when the Item belongs to a different Order"""
-        order1, item = self._create_order_with_item()
+        _, item = self._create_order_with_item()
         order2 = OrderFactory()
         order2.create()
 
@@ -649,7 +649,7 @@ class OrderService(TestCase):
 
     def test_update_item_wrong_order(self):
         """It should return 404 when the Item belongs to a different Order"""
-        order1, item = self._create_order_with_item()
+        _, item = self._create_order_with_item()
         order2 = OrderFactory()
         order2.create()
 
