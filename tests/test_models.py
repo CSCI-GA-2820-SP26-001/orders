@@ -25,7 +25,9 @@ from unittest import TestCase
 from unittest.mock import patch
 from wsgi import app
 from service.models import Order, Item, DataValidationError, db
+from service.models import VALID_STATUSES
 from .factories import OrderFactory, ItemFactory
+
 
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "postgresql+psycopg://postgres:postgres@localhost:5432/testdb"
@@ -285,7 +287,6 @@ class TestOrder(TestCase):
 
     def test_deserialize_valid_statuses(self):
         """It should accept all valid status values"""
-        from service.models import VALID_STATUSES
         for valid_status in VALID_STATUSES:
             order = Order()
             data = {
