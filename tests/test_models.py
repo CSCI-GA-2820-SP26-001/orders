@@ -24,8 +24,10 @@ import logging
 from unittest import TestCase
 from unittest.mock import patch
 from wsgi import app
-from service.models import Order, Item, DataValidationError, db, VALID_STATUSES
+from service.models import Order, Item, DataValidationError, db
+from service.models import VALID_STATUSES
 from .factories import OrderFactory, ItemFactory
+
 
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "postgresql+psycopg://postgres:postgres@localhost:5432/testdb"
