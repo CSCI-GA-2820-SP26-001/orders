@@ -1,40 +1,86 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const fieldIds = [
-        "order_id",
-        "order_customer_id",
-        "order_name",
-        "order_address",
-        "order_email",
-        "order_status",
-    ];
-
-    const clearButton = document.getElementById("clear-btn");
-    const flashMessage = document.getElementById("flash_message");
-
-    function clearFormData() {
-        document.getElementById("order_id").value = "";
-        document.getElementById("order_customer_id").value = "";
-        document.getElementById("order_name").value = "";
-        document.getElementById("order_address").value = "";
-        document.getElementById("order_email").value = "";
-        document.getElementById("order_status").value = "Pending";
+$(function () {
+    function flash_message(message) {
+        $("#flash_message").empty();
+        $("#flash_message").append(message);
     }
 
-    if (clearButton) {
-        clearButton.addEventListener("click", () => {
-            clearFormData();
-            if (flashMessage) {
-                flashMessage.textContent = "Form cleared";
+    function clear_form_data() {
+        $("#order_id").val("");
+        $("#order_customer_id").val("");
+        $("#order_name").val("");
+        $("#order_address").val("");
+        $("#order_email").val("");
+        $("#order_status").val("");
+    }
+
+    function update_form_data(res) {
+        $("#order_id").val(res.id);
+        $("#order_customer_id").val(res.customer_id);
+        $("#order_name").val(res.name);
+        $("#order_address").val(res.address);
+        $("#order_email").val(res.email);
+        $("#order_status").val(res.status);
+    }
+
+    // ****************************************
+    // Clear the form
+    // ****************************************
+    $("#clear-btn").click(function () {
+        $("#flash_message").empty();
+        clear_form_data();
+        $("#search_results tbody").empty();
+    });
+
+    // ****************************************
+    // List/Search Orders
+    // ****************************************
+    $("#search-btn").click(function () {
+        $("#flash_message").empty();
+
+        let ajax = $.ajax({
+            type: "GET",
+            url: "/orders",
+            contentType: "application/json",
+            data: ""
+        });
+
+        ajax.done(function (res) {
+            $("#search_results tbody").empty();
+
+            let firstOrder = null;
+
+            for (let i = 0; i < res.length; i++) {
+                let order = res[i];
+                let row = `
+                    <tr id="row_${i}">
+                        <td>${order.id}</td>
+                        <td>${order.customer_id}</td>
+                        <td>${order.name}</td>
+                        <td>${order.address}</td>
+                        <td>${order.email}</td>
+                        <td>${order.status}</td>
+                    </tr>
+                `;
+                $("#search_results tbody").append(row);
+
+                if (i === 0) {
+                    firstOrder = order;
+                }
+            }
+
+            if (firstOrder) {
+                update_form_data(firstOrder);
+            }
+
+            flash_message("Success");
+        });
+
+        ajax.fail(function (res) {
+            if (res.responseJSON && res.responseJSON.message) {
+                flash_message(res.responseJSON.message);
+            } else {
+                flash_message("Server error!");
             }
         });
-    }
-
-    // Placeholder only for setup story.
-    // CRUD / query / action handlers will be added in later UI stories.
-    fieldIds.forEach((fieldId) => {
-        const element = document.getElementById(fieldId);
-        if (!element) {
-            console.warn(`Missing expected field: ${fieldId}`);
-        }
     });
 });
