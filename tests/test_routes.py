@@ -547,6 +547,53 @@ class OrderService(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     ######################################################################
+    #  A C T I O N   E N D P O I N T   T E S T S
+    ######################################################################
+
+    def test_action_pay_pending_order(self):
+        """It should transition a Pending order to Paid via the pay action"""
+        order = OrderFactory(status="Pending")
+        order.create()
+        response = self.client.post(f"{BASE_URL}/{order.id}/actions/pay")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json()["status"], "Paid")
+
+    def test_action_ship_paid_order(self):
+        """It should transition a Paid order to Shipped via the ship action"""
+        order = OrderFactory(status="Paid")
+        order.create()
+        response = self.client.post(f"{BASE_URL}/{order.id}/actions/ship")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json()["status"], "Shipped")
+
+    def test_action_cancel_pending_order(self):
+        """It should transition a Pending order to Cancelled via the cancel action"""
+        order = OrderFactory(status="Pending")
+        order.create()
+        response = self.client.post(f"{BASE_URL}/{order.id}/actions/cancel")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json()["status"], "Cancelled")
+
+    def test_action_undefined_returns_404(self):
+        """It should return 404 for an undefined action name"""
+        order = OrderFactory(status="Pending")
+        order.create()
+        response = self.client.post(f"{BASE_URL}/{order.id}/actions/refund")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_action_order_not_found(self):
+        """It should return 404 when the order does not exist"""
+        response = self.client.post(f"{BASE_URL}/0/actions/pay")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_action_invalid_transition(self):
+        """It should return 409 when the action is not valid for the current status"""
+        order = OrderFactory(status="Shipped")
+        order.create()
+        response = self.client.post(f"{BASE_URL}/{order.id}/actions/pay")
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    ######################################################################
     #  S T A T U S   W O R K F L O W   T E S T S
     ######################################################################
 
