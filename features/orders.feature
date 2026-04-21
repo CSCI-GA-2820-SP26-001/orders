@@ -22,3 +22,14 @@ Scenario: List all orders
     And I should see "Alice Johnson" in the results
     And I should see "Bob Smith" in the results
     And I should see "Carol Davis" in the results
+
+Scenario: Create a new order
+    When I visit the "Home Page"
+    And I set the "customer_id" to "1004"
+    And I set the "name" to "David Lee"
+    And I set the "address" to "10 Elm Street"
+    And I set the "email" to "david@example.com"
+    And I set the "status" to "Pending"
+    And I press the "Create" button
+    Then I should see the message "Success"
+    And I should see "David Lee" in the results
