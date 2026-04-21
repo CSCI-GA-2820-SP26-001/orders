@@ -58,6 +58,7 @@ def index():
                 "get_item": "GET /orders/{id}/items/{item_id}",
                 "update_item": "PUT /orders/{id}/items/{item_id}",
                 "delete_item": "DELETE /orders/{id}/items/{item_id}",
+                "order_action": "POST /orders/{id}/actions/{action_name}",
             },
         ),
         status.HTTP_200_OK,
@@ -333,6 +334,42 @@ def update_order_item(order_id, item_id):
 
     app.logger.info("Item %s in order %s updated.", item_id, order_id)
     return jsonify(item.serialize()), status.HTTP_200_OK
+
+
+######################################################################
+# TRIGGER AN ACTION ON AN ORDER
+######################################################################
+ACTION_MAP = {
+    "pay": "Paid",
+    "ship": "Shipped",
+    "cancel": "Cancelled",
+}
+
+
+@app.route("/orders/<int:order_id>/actions/<action_name>", methods=["POST"])
+def order_action(order_id, action_name):
+    """Trigger a named action on an Order"""
+    app.logger.info("Request to trigger action '%s' on order [%s]", action_name, order_id)
+
+    if action_name not in ACTION_MAP:
+        abort(status.HTTP_404_NOT_FOUND, f"Action '{action_name}' not found.")
+
+    order = Order.find(order_id)
+    if not order:
+        abort(status.HTTP_404_NOT_FOUND, f"Order with id '{order_id}' was not found.")
+
+    target_status = ACTION_MAP[action_name]
+    allowed = VALID_TRANSITIONS.get(order.status, [])
+    if target_status not in allowed:
+        abort(
+            status.HTTP_409_CONFLICT,
+            f"Cannot perform '{action_name}' on order with status '{order.status}'.",
+        )
+
+    order.status = target_status
+    order.update()
+    app.logger.info("Order [%s] transitioned to '%s' via action '%s'.", order_id, target_status, action_name)
+    return jsonify(order.serialize()), status.HTTP_200_OK
 
 
 ######################################################################
