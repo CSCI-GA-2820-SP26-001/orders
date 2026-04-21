@@ -74,6 +74,28 @@ Scenario: Search orders by name
     And I should not see "Bob Smith" in the results
     And I should not see "Carol Davis" in the results
 
+Scenario: Update an order
+    When I visit the "Home Page"
+    And I press the "Search" button
+    Then I should see the message "Success"
+    When I copy the "ID" field
+    And I press the "Clear" button
+    And I paste the "Order ID" field
+    And I press the "Retrieve" button
+    Then I should see the message "Success"
+    When I change "Name" to "Updated Name"
+    And I change "Address" to "999 New Street"
+    And I press the "Update" button
+    Then I should see the message "Order has been Updated!"
+    And I should see "Updated Name" in the "Name" field
+    And I should see "999 New Street" in the "Address" field
+    When I press the "Clear" button
+    And I paste the "Order ID" field
+    And I press the "Retrieve" button
+    Then I should see the message "Success"
+    And I should see "Updated Name" in the "Name" field
+    And I should see "999 New Street" in the "Address" field
+
 Scenario: Cancel an order
     When I visit the "Home Page"
     And I press the "Search" button
