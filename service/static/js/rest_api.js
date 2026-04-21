@@ -32,6 +32,41 @@ $(function () {
     });
 
     // ****************************************
+    // Retrieve an Order by ID
+    // ****************************************
+    $("#retrieve-btn").click(function () {
+        $("#flash_message").empty();
+
+        let order_id = $("#order_id").val();
+
+        if (!order_id) {
+            flash_message("Order ID is required");
+            return;
+        }
+
+        let ajax = $.ajax({
+            type: "GET",
+            url: `/orders/${order_id}`,
+            contentType: "application/json",
+            data: ""
+        });
+
+        ajax.done(function (res) {
+            update_form_data(res);
+            flash_message("Success");
+        });
+
+        ajax.fail(function (res) {
+            clear_form_data();
+            if (res.responseJSON && res.responseJSON.message) {
+                flash_message(res.responseJSON.message);
+            } else {
+                flash_message("Server error!");
+            }
+        });
+    });
+
+    // ****************************************
     // List/Search Orders
     // ****************************************
     $("#search-btn").click(function () {
