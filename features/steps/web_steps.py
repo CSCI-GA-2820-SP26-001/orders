@@ -74,6 +74,16 @@ def step_impl(context: Any, element_name: str) -> None:
     assert element.get_attribute("value") == ""
 
 
+@then('the "{element_name}" field should not be empty')
+def step_impl(context: Any, element_name: str) -> None:
+    """Verify a field has a value"""
+    element_id = ID_PREFIX + element_name.lower().replace(" ", "_")
+    element = WebDriverWait(context.driver, context.wait_seconds).until(
+        lambda d: d.find_element(By.ID, element_id).get_attribute("value") != ""
+    )
+    assert element
+
+
 @when('I copy the "{element_name}" field')
 def step_impl(context: Any, element_name: str) -> None:
     """Copy a field value"""
