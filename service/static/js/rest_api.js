@@ -172,4 +172,40 @@ $(function () {
             }
         });
     });
+
+    // ****************************************
+// Create an Order
+// ****************************************
+$("#create-btn").click(function () {
+    $("#flash_message").empty();
+
+    let data = {
+        customer_id: parseInt($("#order_customer_id").val()),
+        name: $("#order_name").val(),
+        address: $("#order_address").val(),
+        email: $("#order_email").val(),
+        status: $("#order_status").val()
+    };
+
+    let ajax = $.ajax({
+        type: "POST",
+        url: "/orders",
+        contentType: "application/json",
+        data: JSON.stringify(data)
+    });
+
+    ajax.done(function (res) {
+        update_form_data(res);
+        flash_message("Success");
+    });
+
+    ajax.fail(function (res) {
+        if (res.responseJSON && res.responseJSON.message) {
+            flash_message(res.responseJSON.message);
+        } else {
+            flash_message("Server error!");
+        }
+    });
+});
+
 });
