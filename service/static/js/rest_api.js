@@ -101,6 +101,40 @@ $(function () {
     });
 
     // ****************************************
+    // Delete an Order
+    // ****************************************
+    $("#delete-btn").click(function () {
+        $("#flash_message").empty();
+
+        let order_id = $("#order_id").val();
+
+        if (!order_id) {
+            flash_message("Order ID is required");
+            return;
+        }
+
+        let ajax = $.ajax({
+            type: "DELETE",
+            url: `/orders/${order_id}`,
+            contentType: "application/json",
+            data: ""
+        });
+
+        ajax.done(function () {
+            clear_form_data();
+            flash_message("Order has been Deleted!");
+        });
+
+        ajax.fail(function (res) {
+            if (res.responseJSON && res.responseJSON.message) {
+                flash_message(res.responseJSON.message);
+            } else {
+                flash_message("Server error!");
+            }
+        });
+    });
+
+    // ****************************************
     // List/Search Orders
     // ****************************************
     $("#search-btn").click(function () {
