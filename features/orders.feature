@@ -73,3 +73,16 @@ Scenario: Search orders by name
     And I should see "Alice Johnson" in the results
     And I should not see "Bob Smith" in the results
     And I should not see "Carol Davis" in the results
+
+Scenario: Cancel an order
+    When I visit the "Home Page"
+    And I press the "Search" button
+    Then I should see the message "Success"
+    When I copy the "ID" field
+    And I press the "Clear" button
+    And I paste the "Order ID" field
+    And I press the "Retrieve" button
+    Then I should see the message "Success"
+    When I press the "Cancel" button
+    Then I should see the message "Order has been Cancelled!"
+    And I should see "Cancelled" in the "Status" field
