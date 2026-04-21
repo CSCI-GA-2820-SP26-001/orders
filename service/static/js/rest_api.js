@@ -72,9 +72,29 @@ $(function () {
     $("#search-btn").click(function () {
         $("#flash_message").empty();
 
+        let customer_id = $("#order_customer_id").val();
+        let name = $("#order_name").val();
+        let order_status = $("#order_status").val();
+
+        let params = [];
+        if (customer_id) {
+            params.push(`customer_id=${encodeURIComponent(customer_id)}`);
+        }
+        if (name) {
+            params.push(`name=${encodeURIComponent(name)}`);
+        }
+        if (order_status) {
+            params.push(`status=${encodeURIComponent(order_status)}`);
+        }
+
+        let url = "/orders";
+        if (params.length > 0) {
+            url += "?" + params.join("&");
+        }
+
         let ajax = $.ajax({
             type: "GET",
-            url: "/orders",
+            url: url,
             contentType: "application/json",
             data: ""
         });
