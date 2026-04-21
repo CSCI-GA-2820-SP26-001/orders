@@ -86,3 +86,20 @@ Scenario: Cancel an order
     When I press the "Cancel" button
     Then I should see the message "Order has been Cancelled!"
     And I should see "Cancelled" in the "Status" field
+
+Scenario: Delete an order
+    When I visit the "Home Page"
+    And I press the "Search" button
+    Then I should see the message "Success"
+    When I copy the "ID" field
+    And I press the "Clear" button
+    And I paste the "Order ID" field
+    And I press the "Retrieve" button
+    Then I should see the message "Success"
+    When I press the "Delete" button
+    Then I should see the message "Order has been Deleted!"
+    And the "Order ID" field should be empty
+    And the "Name" field should be empty
+    When I paste the "Order ID" field
+    And I press the "Retrieve" button
+    Then I should see the message "was not found"
