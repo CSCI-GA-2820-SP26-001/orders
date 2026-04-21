@@ -46,3 +46,30 @@ Scenario: Retrieve an order with a non-existent ID
     And I press the "Retrieve" button
     Then I should see the message "was not found"
     And the "Name" field should be empty
+
+Scenario: Search orders by status
+    When I visit the "Home Page"
+    And I select "Paid" in the "Status" dropdown
+    And I press the "Search" button
+    Then I should see the message "Success"
+    And I should see "Bob Smith" in the results
+    And I should not see "Alice Johnson" in the results
+    And I should not see "Carol Davis" in the results
+
+Scenario: Search orders by customer ID
+    When I visit the "Home Page"
+    And I set the "Customer ID" to "1003"
+    And I press the "Search" button
+    Then I should see the message "Success"
+    And I should see "Carol Davis" in the results
+    And I should not see "Alice Johnson" in the results
+    And I should not see "Bob Smith" in the results
+
+Scenario: Search orders by name
+    When I visit the "Home Page"
+    And I set the "Name" to "Alice Johnson"
+    And I press the "Search" button
+    Then I should see the message "Success"
+    And I should see "Alice Johnson" in the results
+    And I should not see "Bob Smith" in the results
+    And I should not see "Carol Davis" in the results
