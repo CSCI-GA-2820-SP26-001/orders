@@ -1,0 +1,8 @@
+# Tekton Task definitions for the Orders CD pipeline.
+# Planned tasks:
+# - clone-repo
+# - lint
+# - test
+# - build-image
+# - deploy
+# - bdd-tests
