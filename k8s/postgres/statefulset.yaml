@@ -24,14 +24,14 @@ spec:
           env:
             - name: POSTGRES_DB
               valueFrom:
-                secretKeyRef:
-                  name: postgres-creds
-                  key: database_name
+                configMapKeyRef:
+                  name: postgres-config
+                  key: postgres_db
             - name: POSTGRES_USER
               valueFrom:
-                secretKeyRef:
-                  name: postgres-creds
-                  key: database_user
+                configMapKeyRef:
+                  name: postgres-config
+                  key: postgres_user
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
