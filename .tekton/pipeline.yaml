@@ -14,7 +14,7 @@ spec:
     - name: revision
       type: string
       description: Git revision to build
-      default: main
+      default: master
     - name: image-name
       type: string
       description: Container image name for the Orders service
@@ -25,4 +25,18 @@ spec:
   workspaces:
     - name: shared-workspace
 
-  tasks: []
+  tasks:
+    - name: clone
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+      params:
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.revision)
+        - name: deleteExisting
+          value: "true"
