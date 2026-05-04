@@ -1,0 +1,28 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: orders-cd-pipeline
+spec:
+  description: |
+    Minimal Tekton pipeline definition for the Orders service.
+    Individual pipeline tasks will be added in separate stories.
+
+  params:
+    - name: repo-url
+      type: string
+      description: GitHub repository URL for the Orders service
+    - name: revision
+      type: string
+      description: Git revision to build
+      default: main
+    - name: image-name
+      type: string
+      description: Container image name for the Orders service
+    - name: base-url
+      type: string
+      description: OpenShift route URL used by BDD tests
+
+  workspaces:
+    - name: shared-workspace
+
+  tasks: []
