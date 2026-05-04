@@ -22,7 +22,10 @@ spec:
               protocol: TCP
           env:
             - name: DATABASE_URI
-              value: "postgresql+psycopg://orders:orders@postgres:5432/orders"
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-creds
+                  key: database_uri
           readinessProbe:
             httpGet:
               path: /health
