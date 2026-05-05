@@ -37,3 +37,34 @@ spec:
         flake8 service tests --count --max-complexity=10 --max-line-length=127 --statistics
         echo "***** Running pylint *****"
         pylint service tests --max-line-length=127
+  
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: test
+spec:
+  description: >-
+    Run unit tests with pytest against the cloned source. Any test failure
+    or coverage drop below 95% exits non-zero so the pipeline stops before
+    build and deploy.
+  workspaces:
+    - name: source
+      description: The workspace containing the cloned source code.
+  steps:
+    - name: test
+      image: docker.io/python:3.12-slim
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: PIPENV_VENV_IN_PROJECT
+          value: "1"
+        - name: RETRY_COUNT
+          value: "1"
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        echo "***** Installing dependencies *****"
+        python -m pip install --upgrade pip pipenv
+        pipenv install --system --dev
+        echo "***** Running unit tests *****"
+        pytest --pspec --cov=service --cov-fail-under=95 --disable-warnings
