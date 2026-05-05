@@ -15,8 +15,7 @@ spec:
       description: name of the application
       name: APP_NAME
       type: string
-    - default: >-
-        image-registry.openshift-image-registry.svc:5000/$(context.pipelineRun.namespace)/$(params.APP_NAME):latest
+    - default: 'image-registry.openshift-image-registry.svc:5000/$(context.pipelineRun.namespace)/$(params.APP_NAME):latest'
       description: The name of the image to build
       name: IMAGE_NAME
       type: string
@@ -68,7 +67,7 @@ spec:
     - name: pylint
       params:
         - name: image
-          value: quay.io/rofrano/python:3.12-slim
+          value: 'quay.io/rofrano/python:3.12-slim'
         - name: path
           value: service
         - name: args
@@ -139,6 +138,19 @@ spec:
       workspaces:
         - name: source
           workspace: pipeline-workspace
+    - name: deploy-image
+      params:
+        - name: image-name
+          value: $(params.IMAGE_NAME)
+        - name: manifest-dir
+          value: k8s
+      runAfter:
+        - buildah
+      taskRef:
+        kind: Task
+        name: deploy-image
+      workspaces:
+        - name: source
+          workspace: pipeline-workspace
   workspaces:
     - name: pipeline-workspace
-  finally: []
