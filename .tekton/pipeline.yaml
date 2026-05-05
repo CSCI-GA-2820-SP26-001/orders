@@ -40,6 +40,15 @@ spec:
       workspaces:
         - name: source
           workspace: shared-workspace
+    - name: test
+      taskRef:
+        name: test
+        kind: Task
+      runAfter:
+        - clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
     - name: deploy
       taskRef:
         name: deploy
