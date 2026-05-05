@@ -1,23 +1,12 @@
-# Tekton Task definitions for the Orders CD pipeline.
-# Planned tasks:
-# - clone-repo
-# - lint
-# - test
-# - build-image
-# - deploy
-# - bdd-tests
 ---
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: lint
 spec:
-  description: >-
-    Run flake8 and pylint against the cloned source. Any lint failure exits
-    non-zero so the pipeline stops before build and deploy.
+  description: Run flake8 and pylint on the cloned source.
   workspaces:
     - name: source
-      description: The workspace containing the cloned source code.
   steps:
     - name: lint
       image: docker.io/python:3.12-slim
@@ -28,16 +17,11 @@ spec:
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
-        echo "***** Installing dependencies *****"
         python -m pip install --upgrade pip pipenv
         pipenv install --system --dev
-        echo "***** Running flake8 (syntax errors) *****"
         flake8 service tests --count --select=E9,F63,F7,F82 --show-source --statistics
-        echo "***** Running flake8 (style) *****"
         flake8 service tests --count --max-complexity=10 --max-line-length=127 --statistics
-        echo "***** Running pylint *****"
         pylint service tests --max-line-length=127
-  
 ---
 apiVersion: tekton.dev/v1
 kind: Task
@@ -68,3 +52,81 @@ spec:
         pipenv install --system --dev
         echo "***** Running unit tests *****"
         pytest --pspec --cov=service --cov-fail-under=95 --disable-warnings
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy
+spec:
+  description: Apply k8s manifests, swap in the new image, wait for rollout.
+  workspaces:
+    - name: source
+  params:
+    - name: IMAGE
+      type: string
+    - name: DEPLOYMENT
+      type: string
+      default: orders
+    - name: ROLLOUT_TIMEOUT
+      type: string
+      default: 5m
+  steps:
+    - name: apply
+      image: quay.io/openshift/origin-cli:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        oc apply -f k8s/deployment.yaml -f k8s/service.yaml -f k8s/ingress.yaml
+    - name: set-image
+      image: quay.io/openshift/origin-cli:latest
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        oc set image deployment/$(params.DEPLOYMENT) $(params.DEPLOYMENT)=$(params.IMAGE)
+    - name: rollout
+      image: quay.io/openshift/origin-cli:latest
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        oc rollout status deployment/$(params.DEPLOYMENT) --timeout=$(params.ROLLOUT_TIMEOUT)
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: bdd-tests
+spec:
+  description: Run Behave against the deployed service.
+  workspaces:
+    - name: source
+  params:
+    - name: BASE_URL
+      type: string
+    - name: WAIT_ATTEMPTS
+      type: string
+      default: "30"
+    - name: WAIT_INTERVAL
+      type: string
+      default: "5"
+  steps:
+    - name: behave
+      image: docker.io/python:3.12-slim
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: BASE_URL
+          value: $(params.BASE_URL)
+        - name: DRIVER
+          value: chrome
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        apt-get update
+        apt-get install -y --no-install-recommends chromium chromium-driver curl
+        rm -rf /var/lib/apt/lists/*
+        python -m pip install --upgrade pip pipenv
+        pipenv install --system --dev
+        for attempt in $(seq 1 $(params.WAIT_ATTEMPTS)); do
+          curl --silent --fail --max-time 5 "${BASE_URL}" >/dev/null 2>&1 && break
+          sleep $(params.WAIT_INTERVAL)
+        done
+        behave
