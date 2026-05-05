@@ -3,24 +3,16 @@ kind: Pipeline
 metadata:
   name: orders-cd-pipeline
 spec:
-  description: |
-    Minimal Tekton pipeline definition for the Orders service.
-    Individual pipeline tasks will be added in separate stories.
-
   params:
     - name: repo-url
       type: string
-      description: GitHub repository URL for the Orders service
     - name: revision
       type: string
-      description: Git revision to build
       default: master
     - name: image-name
       type: string
-      description: Container image name for the Orders service
     - name: base-url
       type: string
-      description: OpenShift route URL used by BDD tests
 
   workspaces:
     - name: shared-workspace
@@ -48,3 +40,25 @@ spec:
       workspaces:
         - name: source
           workspace: shared-workspace
+    - name: deploy
+      taskRef:
+        name: deploy
+      runAfter:
+        - build
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: IMAGE
+          value: $(params.image-name)
+    - name: bdd-tests
+      taskRef:
+        name: bdd-tests
+      runAfter:
+        - deploy
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: BASE_URL
+          value: $(params.base-url)
