@@ -6,3 +6,34 @@
 # - build-image
 # - deploy
 # - bdd-tests
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: lint
+spec:
+  description: >-
+    Run flake8 and pylint against the cloned source. Any lint failure exits
+    non-zero so the pipeline stops before build and deploy.
+  workspaces:
+    - name: source
+      description: The workspace containing the cloned source code.
+  steps:
+    - name: lint
+      image: docker.io/python:3.12-slim
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: PIPENV_VENV_IN_PROJECT
+          value: "1"
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        echo "***** Installing dependencies *****"
+        python -m pip install --upgrade pip pipenv
+        pipenv install --system --dev
+        echo "***** Running flake8 (syntax errors) *****"
+        flake8 service tests --count --select=E9,F63,F7,F82 --show-source --statistics
+        echo "***** Running flake8 (style) *****"
+        flake8 service tests --count --max-complexity=10 --max-line-length=127 --statistics
+        echo "***** Running pylint *****"
+        pylint service tests --max-line-length=127
